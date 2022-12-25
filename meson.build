@@ -6,8 +6,10 @@ source_files = files([
   'src/main.cpp'
 ])
 
+sdl2_dep = dependency('sdl2')
+
 exe = executable('bp', source_files,
-  install : false)
+  dependencies: [sdl2_dep], install : false)
 
 test('basic', exe)
 
