@@ -10,18 +10,17 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
     //SDL_Surface *surface;
     SDL_Event event;
 
-    cout << make_random(1, 5) << endl;
+    //cout << make_random(2, 2) << endl;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
         return 3;
     }
 
-    if (SDL_CreateWindowAndRenderer(320, 240, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
+    if (SDL_CreateWindowAndRenderer(1280, 800, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window and renderer: %s", SDL_GetError());
         return 3;
     }
-
     while (1) {
         SDL_PollEvent(&event);
         if (event.type == SDL_QUIT) {
@@ -31,7 +30,6 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
         SDL_RenderClear(renderer);
         SDL_RenderPresent(renderer);
     }
-
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
 
