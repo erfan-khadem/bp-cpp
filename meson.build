@@ -3,7 +3,8 @@ project('bp-cpp', 'cpp',
   default_options : ['warning_level=3'])
 
 source_files = files([
-  'src/main.cpp'
+  'src/main.cpp',
+  'src/rng.cpp'
 ])
 
 sdl2_dep = dependency('sdl2')

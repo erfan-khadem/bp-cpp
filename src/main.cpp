@@ -1,13 +1,16 @@
 #include <bits/stdc++.h>
 #include "SDL.h"
+#include "rng.h"
 
 using namespace std;
 
-int main(int argc, char** argv) {
+int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) {
 	SDL_Window *window;
     SDL_Renderer *renderer;
-    SDL_Surface *surface;
+    //SDL_Surface *surface;
     SDL_Event event;
+
+    cout << make_random(1, 5) << endl;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
