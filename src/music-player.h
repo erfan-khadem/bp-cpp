@@ -17,6 +17,7 @@ private:
     bool stop_sound;
 public:
     std::vector<std::string> in_game_music;
+    std::map<std::string, Mix_Chunk*> effects_cache;
     bool success;
     /* Plays background music. If `index` is -1, it selects the next song
     *  else if `index` is -2, it selects a song randomly.

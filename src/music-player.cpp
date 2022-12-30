@@ -14,21 +14,10 @@ using namespace std;
 #define MUSIC_PATH "../art/music/"
 
 static MusicPlayer* main_music_player = nullptr;
-static map<int, Mix_Chunk*> playing_wavs;
 
 static void music_stopped(void) {
     assert(main_music_player != nullptr);
     main_music_player->play_music(-1);
-}
-
-void free_playing_wav(const int nch) {
-    if(playing_wavs.find(nch) == playing_wavs.end()) {
-        return;
-    }
-    auto p = playing_wavs[nch];
-    Mix_FreeChunk(p);
-    playing_wavs.erase(nch);
-    return;
 }
 
 MusicPlayer::MusicPlayer(){
@@ -61,7 +50,6 @@ MusicPlayer::MusicPlayer(){
     sort(in_game_music.begin(), in_game_music.end());
     assert(in_game_music.size() > 0);
     Mix_HookMusicFinished(&music_stopped);
-    Mix_ChannelFinished(free_playing_wav);
 }
 
 MusicPlayer::~MusicPlayer() {
@@ -121,8 +109,14 @@ int MusicPlayer::play_sound(const string &filename){
     if(this->stop_sound) {
         return 0;
     }
-    const string comp_fn = MUSIC_PATH + filename;
-    Mix_Chunk *tmp = Mix_LoadWAV(comp_fn.c_str());
+    Mix_Chunk *tmp = nullptr;
+    if(effects_cache.find(filename) != effects_cache.end()) {
+        tmp = effects_cache[filename];
+    } else {
+        const string comp_fn = MUSIC_PATH + filename;
+        tmp = Mix_LoadWAV(comp_fn.c_str());
+        effects_cache[filename] = tmp;
+    }
     if (tmp == nullptr) {
         cerr << "Could not load wav with filename "
              << filename << endl;
@@ -134,8 +128,6 @@ int MusicPlayer::play_sound(const string &filename){
             << filename << endl;
         return -2;
     }
-    // Make sure this is collected as a garbage
-    playing_wavs[ret] = tmp;
     return 0;
 }
 
