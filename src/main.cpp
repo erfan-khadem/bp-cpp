@@ -15,6 +15,7 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
     MusicPlayer *music_player = nullptr;
 
     pii last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1};
+    SDL_Color the_line_color = {30 , 0 , 255};
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
@@ -53,14 +54,21 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
             case SDL_MOUSEMOTION:
                 last_mouse_pos = {event.motion.x, event.motion.y};
                 break;
-            
+            case SDL_MOUSEBUTTONDOWN:
+                the_line_color = {255 , 0 , 255};
+                break;
+            case SDL_MOUSEBUTTONUP:
+                the_line_color = {30 , 0 , 255};
+                break;
+            case SDLK_SPACE:
+                break;
             default:
                 break;
             }
         }
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff); // sets the background color
         SDL_RenderClear(renderer);
-        SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0xff, 0xff);
+        SDL_SetRenderDrawColor(renderer, the_line_color.r , the_line_color.g , the_line_color.b, 0xff);
         SDL_RenderDrawLine(renderer,
             SCREEN_W >> 1, SCREEN_H >> 1,
             last_mouse_pos.first, last_mouse_pos.second);
