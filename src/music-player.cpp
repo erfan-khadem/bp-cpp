@@ -1,13 +1,10 @@
 #include "music-player.h"
 
-#include <iostream>
-#include <vector>
-#include <string>
 #include <filesystem>
 #include <regex>
-#include <cassert>
 
 #include "utils/random_gen.hpp"
+#include "utils/common.h"
 
 using namespace std;
 
@@ -84,7 +81,7 @@ int MusicPlayer::play_music(int index) {
         default:
             cerr << "Invalid music index: " << index << ". ";
             cerr << "Selecting a song randomly." << endl;
-            UID(index_gen, 0, in_game_music.size());
+            UID(index_gen, 0, in_game_music.size() - 1);
             index = index_gen(rng);
             curr_music = index;
             break;
