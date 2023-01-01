@@ -28,6 +28,7 @@ MusicPlayer::MusicPlayer(){
         success = false;
         return;
     }
+    main_music_player = this;
     if (Mix_OpenAudio(48'000, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
         cerr << "SDL_mixer not initialized: " << Mix_GetError() << endl;
         success = false;
