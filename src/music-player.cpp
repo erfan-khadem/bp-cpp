@@ -1,13 +1,10 @@
 #include "music-player.h"
 
-#include <iostream>
-#include <vector>
-#include <string>
 #include <filesystem>
 #include <regex>
-#include <cassert>
 
 #include "utils/random_gen.hpp"
+#include "utils/common.h"
 
 using namespace std;
 
