@@ -58,7 +58,7 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
                 break;
             }
         }
-        SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff);
+        SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff); // sets the background color
         SDL_RenderClear(renderer);
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0xff, 0xff);
         SDL_RenderDrawLine(renderer,
