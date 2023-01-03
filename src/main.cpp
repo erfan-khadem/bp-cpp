@@ -3,6 +3,8 @@
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_sdlrenderer.h"
 
+#include "SDL_image.h"
+#include "math.h"
 #include "utils/error_handling.h"
 #include "utils/common.h"
 #include "music-player.h"
@@ -18,10 +20,18 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
     SDL_Renderer *renderer;
     SDL_Surface *surface __attribute__((unused));
     SDL_Event event;
-
+    SDL_Rect Gun_rect;
+    Gun_rect.h = 160;
+    Gun_rect.w = 80;
+    Gun_rect.x = 600;
+    Gun_rect.y = 320;
+    //double angle_of_canon;
     MusicPlayer *music_player = nullptr;
 
-    pii last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1};
+    pdd last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1}; // Do not change!
+    SDL_Color the_line_color = {30 , 0 , 255};
+
+    const pdd center = last_mouse_pos;
 
     // Init video, timer and audio subsystems. Other subsystems like event are
     // initialized automatically by these options.
@@ -52,6 +62,23 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
     }
     music_player->play_music(0); // Start from the first music
 
+    //setup and initialize sdl2_image library
+    {
+        int flag_IMG = IMG_INIT_PNG;
+        int IMG_init_status = IMG_Init(flag_IMG);
+        if ((IMG_init_status&flag_IMG)!=flag_IMG)
+        {
+            cerr<<"sdl2image format not available"<<endl;
+        }   
+    }
+    SDL_Surface* Gun_image;
+    Gun_image = IMG_Load("../art/images/Gun_01.png");
+    if (!Gun_image)
+    {
+        cerr<<"image not loaded"<<endl;
+    }
+    SDL_Texture* Gun_Texture = SDL_CreateTextureFromSurface(renderer , Gun_image);
+
     // Now let's setup ImGUI:
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -79,10 +106,17 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
             case SDL_MOUSEMOTION:
                 last_mouse_pos = {event.motion.x, event.motion.y};
                 break;
-            
+            case SDL_MOUSEBUTTONDOWN:
+                the_line_color = {255 , 0 , 255};
+                break;
+            case SDL_MOUSEBUTTONUP:
+                the_line_color = {30 , 0 , 255};
+                break;
+            case SDLK_SPACE:
+                break;
             default:
                 break;
-            }
+        }       
         }
         ImGui_ImplSDLRenderer_NewFrame();
         ImGui_ImplSDL2_NewFrame();
@@ -106,18 +140,23 @@ int main(int argc __attribute__((unused)), char** argv __attribute__((unused))) 
 
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff); // sets the background color
         SDL_RenderClear(renderer);
-        SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0xff, 0xff);
+        SDL_SetRenderDrawColor(renderer, the_line_color.r , the_line_color.g , the_line_color.b, 0xff);
         SDL_RenderDrawLine(renderer,
             SCREEN_W >> 1, SCREEN_H >> 1,
             last_mouse_pos.first, last_mouse_pos.second);
         
         ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());
+       
+        pdd diff = last_mouse_pos - center;
+        const double phase = vector_phase(diff) + (PI / 2.0);
+        SDL_RenderCopyEx(renderer, Gun_Texture, NULL, &Gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);
         SDL_RenderPresent(renderer);
     }
-
+    SDL_FreeSurface(Gun_image);
+    SDL_DestroyTexture(Gun_Texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-
+    IMG_Quit();
     SDL_Quit();
 
     return 0;

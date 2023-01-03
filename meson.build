@@ -9,6 +9,7 @@ source_files = files([
 
 sdl2_dep = dependency('sdl2')
 sdl2_mixer_dep = dependency('sdl2_mixer')
+sdl2_image_dep = dependency('sdl2_image')
 
 imgui_incdir = include_directories('external/imgui')
 imgui_backend_incdir = include_directories('external/imgui/backends')
@@ -25,7 +26,7 @@ imgui_src = files([
 source_files += imgui_src
 
 exe = executable('bp', source_files,
-  dependencies: [sdl2_dep, sdl2_mixer_dep],
+  dependencies: [sdl2_dep, sdl2_mixer_dep, sdl2_image_dep],
   include_directories: [imgui_incdir, imgui_backend_incdir],
   install : false)
 
