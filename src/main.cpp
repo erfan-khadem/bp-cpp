@@ -1,4 +1,8 @@
 #include "SDL.h"
+#include "imgui.h"
+#include "imgui_impl_sdl.h"
+#include "imgui_impl_sdlrenderer.h"
+
 #include "SDL_image.h"
 #include "math.h"
 #include "utils/error_handling.h"
@@ -6,6 +10,10 @@
 #include "music-player.h"
 
 using namespace std;
+
+#if !SDL_VERSION_ATLEAST(2, 0, 17)
+#error ImGUI requires SDL 2.0.17+ because of SDL_RenderGeometry() function
+#endif
 
 int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 {
@@ -26,7 +34,9 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 
     const pdd center = last_mouse_pos;
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    // Init video, timer and audio subsystems. Other subsystems like event are
+    // initialized automatically by these options.
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0)
     {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
         return 3;
@@ -38,10 +48,13 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
         return 1;
     }
 
+    // Use OpenGL acceleration and allow High-DPI for ImGUI
     window = SDL_CreateWindow("BP-cpp",
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                              SCREEN_W, SCREEN_H, SDL_WINDOW_OPENGL);
+                              SCREEN_W, SCREEN_H,
+                              SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI);
 
+    // Use VSync to limit framerate
     renderer = SDL_CreateRenderer(window,
                                   -1,
                                   SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
@@ -70,12 +83,27 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
     }
     SDL_Texture *Gun_Texture = SDL_CreateTextureFromSurface(renderer, Gun_image);
 
+    // Now let's setup ImGUI:
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    ImGui::StyleColorsLight();
+
+    ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
+    ImGui_ImplSDLRenderer_Init(renderer);
+
+    io.Fonts->AddFontFromFileTTF("../art/fonts/roboto-medium.ttf", 20.0f);
+
     bool should_quit = false;
 
     while (!should_quit)
     {
         while (!should_quit && SDL_PollEvent(&event))
         {
+            ImGui_ImplSDL2_ProcessEvent(&event);
             switch (event.type)
             {
             case SDL_QUIT:
@@ -97,15 +125,35 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
                 break;
             }
         }
+        ImGui_ImplSDLRenderer_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
 
-        // cout<<"("<<last_mouse_pos.first-640<<","<<-(last_mouse_pos.second-400)<<")"<<endl;
-        // angle_of_canon = (angle_of_canon*180)/ PI ;
+        {
+            static int counter = 0;
+
+            ImGui::Begin("Settings");
+            ImGui::Text("This is some useful text.");
+            if (ImGui::Button("Button"))
+            {
+                counter++;
+            }
+            ImGui::SameLine();
+            ImGui::Text("Counter = %d", counter);
+            ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
+            ImGui::End();
+        }
+
+        ImGui::Render();
+
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff); // sets the background color
         SDL_RenderClear(renderer);
-        SDL_SetRenderDrawColor(renderer, the_line_color.r, the_line_color.g, the_line_color.b, the_line_color.a);
+        SDL_SetRenderDrawColor(renderer, the_line_color.r, the_line_color.g, the_line_color.b, 0xff);
         SDL_RenderDrawLine(renderer,
                            SCREEN_W >> 1, SCREEN_H >> 1,
                            last_mouse_pos.first, last_mouse_pos.second);
+
+        ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());
 
         pdd diff = last_mouse_pos - center;
         const double phase = vector_phase(diff) + (PI / 2.0);
