@@ -20,6 +20,9 @@ using std::vector;
 using std::pair;
 using std::string;
 
+typedef int64_t s64;
+typedef uint64_t u64;
+
 typedef std::pair<int, int> pii;
 
 #include "vec_utils.hpp"
