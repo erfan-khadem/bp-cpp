@@ -5,13 +5,15 @@ project('bp-cpp', 'cpp',
 source_files = files([
   'src/main.cpp',
   'src/music-player.cpp',
-  'src/user.cpp'
+  'src/user.cpp',
+  'src/utils/time.cpp'
 ])
 
 sdl2_dep = dependency('sdl2')
 sdl2_mixer_dep = dependency('sdl2_mixer')
 sdl2_image_dep = dependency('sdl2_image')
 json_dep = dependency('nlohmann_json')
+sodium_dep = dependency('libsodium')
 
 imgui_incdir = include_directories('external/imgui')
 imgui_backend_incdir = include_directories('external/imgui/backends')
@@ -28,7 +30,7 @@ imgui_src = files([
 source_files += imgui_src
 
 exe = executable('bp', source_files,
-  dependencies: [sdl2_dep, sdl2_mixer_dep, sdl2_image_dep, json_dep],
+  dependencies: [sdl2_dep, sdl2_mixer_dep, sdl2_image_dep, json_dep, sodium_dep],
   include_directories: [imgui_incdir, imgui_backend_incdir],
   install : false)
 

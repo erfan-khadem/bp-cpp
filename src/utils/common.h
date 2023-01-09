@@ -1,10 +1,12 @@
 #pragma once
 
+#include <map>
 #include <cmath>
 #include <cassert>
 #include <string>
 #include <vector>
 #include <utility>
+#include <fstream>
 #include <iostream>
 
 #define SCREEN_W 1280
@@ -19,6 +21,8 @@ using std::cout;
 using std::vector;
 using std::pair;
 using std::string;
+using std::map;
+using std::endl;
 
 typedef int64_t s64;
 typedef uint64_t u64;

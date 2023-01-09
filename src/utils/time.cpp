@@ -1,9 +1,4 @@
-#pragma once
-
-#include <ctime>
-#include <string>
-
-using std::string;
+#include "time.h"
 
 time_t get_utc_secs()
 {

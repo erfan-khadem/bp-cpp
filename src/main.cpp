@@ -1,3 +1,5 @@
+#include <sodium.h>
+
 #include "SDL.h"
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
@@ -8,6 +10,8 @@
 #include "utils/error_handling.h"
 #include "utils/common.h"
 #include "music-player.h"
+#include "user.h"
+#include "draw_users_table.hpp"
 
 using namespace std;
 
@@ -26,13 +30,19 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
     Gun_rect.w = 80;
     Gun_rect.x = 600;
     Gun_rect.y = 320;
-    // double angle_of_canon;
     MusicPlayer *music_player = nullptr;
+    UserMap users = get_user_list();
 
     pdd last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1}; // Do not change!
+    const pdd center = last_mouse_pos;
+
+    // TODO: Remove me!
     SDL_Color the_line_color = {30, 0, 255, 255};
 
-    const pdd center = last_mouse_pos;
+    if (sodium_init() < 0) {
+        cerr << "Could not initialize libsodium, quiting" << endl;
+        return 1;
+    }
 
     // Init video, timer and audio subsystems. Other subsystems like event are
     // initialized automatically by these options.
@@ -141,6 +151,7 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
             ImGui::SameLine();
             ImGui::Text("Counter = %d", counter);
             ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
+            draw_users_table(users);
             ImGui::End();
         }
 
@@ -166,6 +177,8 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
     SDL_DestroyWindow(window);
     IMG_Quit();
     SDL_Quit();
+
+    save_user_list(users);
 
     return 0;
 }
