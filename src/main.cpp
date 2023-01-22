@@ -21,12 +21,10 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
     SDL_Rect balls_rect , balls_rect2;
     balls_rect.h = 40;
     balls_rect.w = 40;
-    balls_rect.x =  100;
+    balls_rect.x = 100;
     balls_rect.y = 200;
-    balls_rect2.h = 40;
-    balls_rect2.w = 40;
-    balls_rect2.x =  40;
-    balls_rect2.y = 40;
+    balls_rect2 = balls_rect;
+
     //reading existing road -> (the first line of the "locations_file.txt" shows the existence of road , second line is number of coordinates);
     //if you made new road , add "1" and number of coordinates.
     ifstream location_file;
@@ -47,7 +45,7 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
         locations.push_back(make_pair(x,y));
     }
     }
-    int counter_for_loc = 0;  
+    double counter_for_loc = 0;  
     location_file.close();
 
     //-----------
@@ -104,20 +102,75 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
     SDL_Surface *Gun_image;
     SDL_Surface *ball_01_image;
     SDL_Surface *ball_02_image;
+    SDL_Surface *saye1_image;
+    SDL_Surface *saye2_image;
+    SDL_Surface *saye3_image;
+    SDL_Surface *saye4_image;
+    SDL_Surface *saye5_image;
+    SDL_Surface *saye6_image;
+    SDL_Surface *saye7_image;
+    SDL_Surface *saye8_image;
+    SDL_Surface *saye9_image;
+    SDL_Surface *saye10_image;
+    SDL_Surface *saye11_image;
+    SDL_Surface *saye12_image;
+    SDL_Surface *saye13_image;
+    SDL_Surface *saye14_image;
+    SDL_Surface *saye15_image;
+    //SDL_Surface *saye16_image;
 
     Gun_image = IMG_Load("../art/images/Gun_01.png");
     ball_01_image = IMG_Load("../art/images/ball_01.png");
     ball_02_image = IMG_Load("../art/images/ball_02.png");
+    saye1_image = IMG_Load("../art/images/s1.png");
+    saye2_image = IMG_Load("../art/images/s2.png");
+    saye3_image = IMG_Load("../art/images/s3.png");
+    saye4_image = IMG_Load("../art/images/s4.png");
+    saye5_image = IMG_Load("../art/images/s5.png");
+    saye6_image = IMG_Load("../art/images/s6.png");
+    saye7_image = IMG_Load("../art/images/s7.png");
+    saye8_image = IMG_Load("../art/images/s8.png");
+    saye9_image = IMG_Load("../art/images/s9.png");
+    saye10_image = IMG_Load("../art/images/s10.png");
+    saye11_image = IMG_Load("../art/images/s11.png");
+    saye12_image = IMG_Load("../art/images/s12.png");
+    saye13_image = IMG_Load("../art/images/s13.png");
+    saye14_image = IMG_Load("../art/images/s14.png");
+    saye15_image = IMG_Load("../art/images/s15.png");
+    //saye16_image = IMG_Load("../art/images/s16.png");
 
-    if (!(Gun_image || ball_01_image || ball_02_image))
+
+    if (!(Gun_image || ball_01_image || ball_02_image || saye1_image))
     {
         cerr << "image not loaded" << endl;
     }
+
     SDL_Texture *Gun_Texture = SDL_CreateTextureFromSurface(renderer, Gun_image);
     SDL_Texture *ball_01_texture = SDL_CreateTextureFromSurface(renderer, ball_01_image);
     SDL_Texture *ball_02_texture = SDL_CreateTextureFromSurface(renderer, ball_02_image);
-    bool should_quit = false;
+    SDL_Texture *saye1tex = SDL_CreateTextureFromSurface(renderer, saye1_image);
+    SDL_Texture *saye2tex = SDL_CreateTextureFromSurface(renderer, saye2_image);
+    SDL_Texture *saye3tex = SDL_CreateTextureFromSurface(renderer, saye3_image);
+    SDL_Texture *saye4tex = SDL_CreateTextureFromSurface(renderer, saye4_image);
+    SDL_Texture *saye5tex = SDL_CreateTextureFromSurface(renderer, saye5_image);
+    SDL_Texture *saye6tex = SDL_CreateTextureFromSurface(renderer, saye6_image);
+    SDL_Texture *saye7tex = SDL_CreateTextureFromSurface(renderer, saye7_image);
+    SDL_Texture *saye8tex = SDL_CreateTextureFromSurface(renderer, saye8_image);
+    SDL_Texture *saye9tex = SDL_CreateTextureFromSurface(renderer, saye9_image);
+    SDL_Texture *saye10tex = SDL_CreateTextureFromSurface(renderer, saye10_image);
+    SDL_Texture *saye11tex = SDL_CreateTextureFromSurface(renderer, saye11_image);
+    SDL_Texture *saye12tex = SDL_CreateTextureFromSurface(renderer, saye12_image);
+    SDL_Texture *saye13tex = SDL_CreateTextureFromSurface(renderer, saye13_image);
+    SDL_Texture *saye14tex = SDL_CreateTextureFromSurface(renderer, saye14_image);
+    SDL_Texture *saye15tex = SDL_CreateTextureFromSurface(renderer, saye15_image);
+    //SDL_Texture *saye16tex = SDL_CreateTextureFromSurface(renderer, saye16_image);
+
+    SDL_Texture *sayeha_araye[15] = {saye1tex,saye2tex,saye3tex,saye4tex,saye5tex,saye6tex,saye7tex,saye8tex,saye9tex,saye10tex,saye11tex,saye12tex,saye13tex,saye14tex,saye15tex};
     
+
+    bool should_quit = false;
+    int saye_index;
+    double counter_for_saye = 0;
     
     //uncomment if want new road; 
     /*
@@ -163,9 +216,10 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
             }    
         }
         if(is_map_available == 1 && counter_for_loc<locations.size()){
-            counter_for_loc++;
+            counter_for_loc+=.32;
+            counter_for_saye += 1.3;
         }
-        //cout<<locations[counter2_for_loc-1].first<<" "<<locations[counter2_for_loc-1].second<<endl;
+
         balls_rect.x = locations[counter_for_loc-1].first;
         balls_rect.y = locations[counter_for_loc-1].second;
         balls_rect2.x = locations[counter_for_loc-41].first;
@@ -177,22 +231,30 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
         SDL_RenderDrawLine(renderer,
                            SCREEN_W >> 1, SCREEN_H >> 1,
                            last_mouse_pos.first, last_mouse_pos.second);
-
         pdd diff = last_mouse_pos - center;
+        pdd diff_ball = {locations[counter_for_loc+5].first - locations[counter_for_loc-5].first , locations[counter_for_loc+5].second - locations[counter_for_loc-5].second};
         const double phase = vector_phase(diff) + (PI / 2.0);
+        const double phase_ball = vector_phase(diff_ball);
         SDL_RenderCopy(renderer , ball_01_texture , NULL , &balls_rect);// show ball 1 in its position
         SDL_RenderCopy(renderer , ball_02_texture , NULL , &balls_rect2);// show ball 2 in its position
-        SDL_RenderCopyEx(renderer, Gun_Texture, NULL, &Gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);//rotate_and_show wepon
+
+        if(counter_for_saye < 150){
+            saye_index = counter_for_saye/10;
+            SDL_RenderCopyEx(renderer , sayeha_araye[saye_index] , NULL , &balls_rect , phase_ball*RAD_TO_DEG, NULL , SDL_FLIP_NONE);
+            }
+        if(counter_for_saye>200){
+            counter_for_saye = 0;
+        }   
+
+        SDL_RenderCopyEx(renderer, Gun_Texture, NULL, &Gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);//rotate and show wepon
         SDL_RenderPresent(renderer);
     }
     SDL_FreeSurface(Gun_image);
     SDL_FreeSurface(background_01);
-    SDL_DestroyTexture(Gun_Texture);
     SDL_DestroyTexture(background_01_tex);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     IMG_Quit();
     SDL_Quit();
-
     return 0;
 }
