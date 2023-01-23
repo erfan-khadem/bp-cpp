@@ -1,64 +1,100 @@
+#include <fstream>
+#include <cmath>
+#include <cstdlib>
+#include <cstdio>
+
+#include <unistd.h>
+
 #include "SDL.h"
 #include "SDL_image.h"
-#include "math.h"
+
 #include "utils/error_handling.h"
 #include "utils/common.h"
 #include "music-player.h"
-#include "fstream"
+#include "ball.hpp"
+
 using namespace std;
 
-int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
+#define BALL_TEXT_COUNT 5
+
+static bool should_record_map = false;
+
+void parse_arguments(const int argc, char **argv) {
+    int opt;
+    while ((opt = getopt(argc, argv, "t")) != -1) {
+        switch (opt) {
+        case 't':
+            should_record_map = true;
+            break;
+        default:
+            cerr << "The only valid flag is -t for creating a new map" << endl;
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+int main(int argc, char **argv)
 {
+    parse_arguments(argc, argv);
+
+    char buf[100];
+    double counter_for_loc = 0;  
+
+    s64 prev_time = 0;
+    s64 curr_time = 0;
+
     SDL_Window *window;
     SDL_Renderer *renderer;
-    SDL_Surface *surface __attribute__((unused));
     SDL_Event event;
-    SDL_Rect Gun_rect;
-    Gun_rect.h = 160;
-    Gun_rect.w = 80;
-    Gun_rect.x = 600;
-    Gun_rect.y = 320;
-    SDL_Rect balls_rect , balls_rect2;
-    balls_rect.h = 40;
-    balls_rect.w = 40;
-    balls_rect.x = 100;
-    balls_rect.y = 200;
-    balls_rect2 = balls_rect;
+    SDL_Rect gun_rect = {.x=600, .y=320, .w=80, .h=160};
 
-    //reading existing road -> (the first line of the "locations_file.txt" shows the existence of road , second line is number of coordinates);
-    //if you made new road , add "1" and number of coordinates.
-    ifstream location_file;
-    location_file.open("../src/locations_file.txt");
-    int is_map_available;
+    SDL_Texture *gun_texture;
+    SDL_Texture *map_texture;
+
+    vector<SDL_Texture*> ball_textures;
+    vector<pair<int,int>> locations;
+    vector<Ball> balls;
+
+    /*
+    reading existing road -> (the first line of the "locations_file.txt"
+    shows the existence of road , second line is number of coordinates);
+    if you made new road , add "1" and number of coordinates.
+    */
+    ifstream map_file;
+    ofstream new_map_location;
+
+    map_file.open("../art/maps/map01.txt");
     int i_want_new_map = 0;
     int number_of_coordinates = 0;
-    location_file>>is_map_available;
-    vector< pair <int,int>>locations;
-    if(is_map_available == 1){
-    location_file>>number_of_coordinates;
-    for (int i = 0; i < number_of_coordinates;i++)
     {
-        int x;
-        location_file>>x;
-        int y;
-        location_file>>y;
-        locations.push_back(make_pair(x,y));
+        int is_map_available;
+        map_file >> is_map_available;
+        if(is_map_available == 1){
+            map_file >> number_of_coordinates;
+            for (int i = 0; i < number_of_coordinates;i++)
+            {
+                int x, y;
+                map_file >> x >> y;
+                locations.emplace_back(x,y);
+            }
+        }
     }
-    }
-    double counter_for_loc = 0;  
-    location_file.close();
+    map_file.close();
 
-    //-----------
     MusicPlayer *music_player = nullptr;
 
+    // TODO: Delete me!
     pdd last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1};// Do not change!
-    SDL_Color the_line_color = {30, 0, 255};
+    SDL_Color the_line_color = {30, 0, 255, 255};
 
     const pdd center = last_mouse_pos;
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) < 0)
     {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+            "Couldn't initialize SDL: %s",
+            SDL_GetError()
+        );
         return 3;
     }
 
@@ -81,13 +117,6 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window and renderer: %s", SDL_GetError());
         return 3;
     }
-    music_player->play_music(0); // Start from the first music
-    SDL_Surface *background_01 = SDL_LoadBMP("../art/images/ground_02.bmp");
-    SDL_Texture *background_01_tex = SDL_CreateTextureFromSurface(renderer, background_01);
-    if (!(background_01 || background_01_tex))
-    {
-        SDL_ShowSimpleMessageBox(0, "background init error", SDL_GetError(), window);
-    }
 
     // setup and initialize sdl2_image library
     {
@@ -98,86 +127,44 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
             cerr << "sdl2image format not available" << endl;
         }
     }
-    //----------------------------
-    SDL_Surface *Gun_image;
-    SDL_Surface *ball_01_image;
-    SDL_Surface *ball_02_image;
-    SDL_Surface *saye1_image;
-    SDL_Surface *saye2_image;
-    SDL_Surface *saye3_image;
-    SDL_Surface *saye4_image;
-    SDL_Surface *saye5_image;
-    SDL_Surface *saye6_image;
-    SDL_Surface *saye7_image;
-    SDL_Surface *saye8_image;
-    SDL_Surface *saye9_image;
-    SDL_Surface *saye10_image;
-    SDL_Surface *saye11_image;
-    SDL_Surface *saye12_image;
-    SDL_Surface *saye13_image;
-    SDL_Surface *saye14_image;
-    SDL_Surface *saye15_image;
-    //SDL_Surface *saye16_image;
 
-    Gun_image = IMG_Load("../art/images/Gun_01.png");
-    ball_01_image = IMG_Load("../art/images/ball_01.png");
-    ball_02_image = IMG_Load("../art/images/ball_02.png");
-    saye1_image = IMG_Load("../art/images/s1.png");
-    saye2_image = IMG_Load("../art/images/s2.png");
-    saye3_image = IMG_Load("../art/images/s3.png");
-    saye4_image = IMG_Load("../art/images/s4.png");
-    saye5_image = IMG_Load("../art/images/s5.png");
-    saye6_image = IMG_Load("../art/images/s6.png");
-    saye7_image = IMG_Load("../art/images/s7.png");
-    saye8_image = IMG_Load("../art/images/s8.png");
-    saye9_image = IMG_Load("../art/images/s9.png");
-    saye10_image = IMG_Load("../art/images/s10.png");
-    saye11_image = IMG_Load("../art/images/s11.png");
-    saye12_image = IMG_Load("../art/images/s12.png");
-    saye13_image = IMG_Load("../art/images/s13.png");
-    saye14_image = IMG_Load("../art/images/s14.png");
-    saye15_image = IMG_Load("../art/images/s15.png");
-    //saye16_image = IMG_Load("../art/images/s16.png");
-
-
-    if (!(Gun_image || ball_01_image || ball_02_image || saye1_image))
+    music_player->play_music(0); // Start from the first music
+    SDL_Surface *background_01 = IMG_Load("../art/images/ground_02.jpg");
+    SDL_Texture *background_01_tex = SDL_CreateTextureFromSurface(renderer, background_01);
+    if (!(background_01 || background_01_tex))
     {
-        cerr << "image not loaded" << endl;
+        SDL_ShowSimpleMessageBox(0, "background init error", SDL_GetError(), window);
+        return 1;
     }
-
-    SDL_Texture *Gun_Texture = SDL_CreateTextureFromSurface(renderer, Gun_image);
-    SDL_Texture *ball_01_texture = SDL_CreateTextureFromSurface(renderer, ball_01_image);
-    SDL_Texture *ball_02_texture = SDL_CreateTextureFromSurface(renderer, ball_02_image);
-    SDL_Texture *saye1tex = SDL_CreateTextureFromSurface(renderer, saye1_image);
-    SDL_Texture *saye2tex = SDL_CreateTextureFromSurface(renderer, saye2_image);
-    SDL_Texture *saye3tex = SDL_CreateTextureFromSurface(renderer, saye3_image);
-    SDL_Texture *saye4tex = SDL_CreateTextureFromSurface(renderer, saye4_image);
-    SDL_Texture *saye5tex = SDL_CreateTextureFromSurface(renderer, saye5_image);
-    SDL_Texture *saye6tex = SDL_CreateTextureFromSurface(renderer, saye6_image);
-    SDL_Texture *saye7tex = SDL_CreateTextureFromSurface(renderer, saye7_image);
-    SDL_Texture *saye8tex = SDL_CreateTextureFromSurface(renderer, saye8_image);
-    SDL_Texture *saye9tex = SDL_CreateTextureFromSurface(renderer, saye9_image);
-    SDL_Texture *saye10tex = SDL_CreateTextureFromSurface(renderer, saye10_image);
-    SDL_Texture *saye11tex = SDL_CreateTextureFromSurface(renderer, saye11_image);
-    SDL_Texture *saye12tex = SDL_CreateTextureFromSurface(renderer, saye12_image);
-    SDL_Texture *saye13tex = SDL_CreateTextureFromSurface(renderer, saye13_image);
-    SDL_Texture *saye14tex = SDL_CreateTextureFromSurface(renderer, saye14_image);
-    SDL_Texture *saye15tex = SDL_CreateTextureFromSurface(renderer, saye15_image);
-    //SDL_Texture *saye16tex = SDL_CreateTextureFromSurface(renderer, saye16_image);
-
-    SDL_Texture *sayeha_araye[15] = {saye1tex,saye2tex,saye3tex,saye4tex,saye5tex,saye6tex,saye7tex,saye8tex,saye9tex,saye10tex,saye11tex,saye12tex,saye13tex,saye14tex,saye15tex};
-    
-
+    for(int i = 1; i <= BALL_TEXT_COUNT; i++) {
+        snprintf(buf, 90, "../art/images/ball%02d.png", i);
+        auto surf = IMG_Load(buf);
+        ball_textures.push_back(SDL_CreateTextureFromSurface(renderer, surf));
+        assert(ball_textures.back() != nullptr);
+    }
+    {
+        auto surf = IMG_Load("../art/maps/map01.png");
+        map_texture = SDL_CreateTextureFromSurface(renderer, surf);
+    }
+    {
+        SDL_Surface *gun_image;
+        gun_image = IMG_Load("../art/images/gun01.png");
+        gun_texture = SDL_CreateTextureFromSurface(renderer, gun_image);
+    }
+    {
+        UID(color_gen, 0, ball_textures.size() - 1);
+        for(int i = 0; i < 20; i++) {
+            const int ball_color = color_gen(rng);
+            balls.emplace_back(ball_color, ball_textures[ball_color], renderer, &locations);
+        }
+    }
     bool should_quit = false;
-    int saye_index;
-    double counter_for_saye = 0;
     
     //uncomment if want new road; 
-    /*
-    fstream location_file2;
-    location_file2.open("../src/locations_file.txt", ios::out);
-    i_want_new_map = 1;
-    */
+    if(should_record_map){
+        new_map_location.open("../art/maps/generator/new_locations_file.txt", ios::out);
+        i_want_new_map = 1;
+    }
 
     while (!should_quit)
     {
@@ -191,67 +178,64 @@ int main(int argc __attribute__((unused)), char **argv __attribute__((unused)))
 
             case SDL_MOUSEMOTION:
                 last_mouse_pos = {event.motion.x, event.motion.y};
-                    
-                    //uncomment if want new road;
-                    /*
-                    if(i_want_new_map == 1){
-	            	location_file2 <<event.motion.x<<" "<<event.motion.y<<endl;//making new map if you want new map;
-	            	}
-                    */
                 break;
             case SDL_MOUSEBUTTONDOWN:
-                the_line_color = {255, 0, 255};
-                //uncomment if want new road
-                //i_want_new_map = 0;
+                if(should_record_map && i_want_new_map == 1){
+                    new_map_location << event.motion.x << " " << event.motion.y << endl;//making new map if you want new map;
+                }
+                the_line_color = {255, 0, 255, 255};
                 break;
             case SDL_MOUSEBUTTONUP:
-                the_line_color = {30, 0, 255};
+                the_line_color = {30, 0, 255, 255};
                 break;
-            case SDLK_SPACE:
+
+            case SDL_KEYDOWN:
+                if(event.key.keysym.sym == SDLK_SPACE){
+                    the_line_color = {255, 0, 255, 255};
+                    i_want_new_map = 0;
+                    cerr << "I stopped recording coordinates!" << endl;
+                }
                 break;
- 
+
+            case SDL_KEYUP:
+                the_line_color = {30, 0, 255, 255};
+                break;
 
             default:
                 break;
             }    
         }
-        if(is_map_available == 1 && counter_for_loc<locations.size()){
-            counter_for_loc+=.32;
-            counter_for_saye += 1.3;
+        curr_time = (s64) SDL_GetTicks64();
+        if(counter_for_loc < locations.size()){
+            double dt = curr_time - prev_time;
+            dt /= 1000;
+            counter_for_loc += 2 * dt * 100; // 2 positions every 100ms
         }
-
-        balls_rect.x = locations[counter_for_loc-1].first;
-        balls_rect.y = locations[counter_for_loc-1].second;
-        balls_rect2.x = locations[counter_for_loc-41].first;
-        balls_rect2.y = locations[counter_for_loc-41].second;
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff); // sets the background color
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, background_01_tex, NULL, NULL);
+        SDL_RenderCopy(renderer, map_texture, NULL, NULL);
         SDL_SetRenderDrawColor(renderer, the_line_color.r, the_line_color.g, the_line_color.b, 0xff);
         SDL_RenderDrawLine(renderer,
                            SCREEN_W >> 1, SCREEN_H >> 1,
                            last_mouse_pos.first, last_mouse_pos.second);
         pdd diff = last_mouse_pos - center;
-        pdd diff_ball = {locations[counter_for_loc+5].first - locations[counter_for_loc-5].first , locations[counter_for_loc+5].second - locations[counter_for_loc-5].second};
         const double phase = vector_phase(diff) + (PI / 2.0);
-        const double phase_ball = vector_phase(diff_ball);
-        SDL_RenderCopy(renderer , ball_01_texture , NULL , &balls_rect);// show ball 1 in its position
-        SDL_RenderCopy(renderer , ball_02_texture , NULL , &balls_rect2);// show ball 2 in its position
-
-        if(counter_for_saye < 150){
-            saye_index = counter_for_saye/10;
-            SDL_RenderCopyEx(renderer , sayeha_araye[saye_index] , NULL , &balls_rect , phase_ball*RAD_TO_DEG, NULL , SDL_FLIP_NONE);
-            }
-        if(counter_for_saye>200){
-            counter_for_saye = 0;
-        }   
-
-        SDL_RenderCopyEx(renderer, Gun_Texture, NULL, &Gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);//rotate and show wepon
+        SDL_RenderCopyEx(renderer, gun_texture, NULL, &gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);//rotate and show wepon
+        balls[0].move_to_location(counter_for_loc);
+        for(int i = 1; i < int(balls.size()); i++) {
+            const int pos = balls[i - 1].get_previous_ball_pos();
+            balls[i].move_to_location(pos);
+        }
+        for(int i = 0; i < int(balls.size()); i++) {
+            balls[i].draw_ball();
+        }
+        prev_time = curr_time;
         SDL_RenderPresent(renderer);
     }
-    SDL_FreeSurface(Gun_image);
     SDL_FreeSurface(background_01);
     SDL_DestroyTexture(background_01_tex);
+    SDL_DestroyTexture(gun_texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     IMG_Quit();

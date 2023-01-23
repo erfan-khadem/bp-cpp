@@ -16,11 +16,15 @@
 
 using std::cerr;
 using std::cout;
+using std::endl;
 using std::vector;
 using std::pair;
 using std::string;
 
 typedef std::pair<int, int> pii;
+typedef int64_t s64;
 
 #include "vec_utils.hpp"
 #include "phase.hpp"
+#include "geometry.hpp"
+#include "random_gen.hpp"
