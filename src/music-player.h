@@ -1,9 +1,10 @@
 #pragma once
 
-#include "SDL_mixer.h"
 #include <vector>
 #include <map>
 #include <string>
+
+#include "SDL_mixer.h"
 
 void basic_music();
 
