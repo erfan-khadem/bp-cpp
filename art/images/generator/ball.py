@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 
 DIM_X = 1280
@@ -26,7 +26,9 @@ def main() -> None:
         draw_circle(draw, 220, b)
         draw_circle(draw, 280, a)
 
-        image.save("ball{:02}.png".format(i + 1))
+        image_final = image.filter(ImageFilter.GaussianBlur(10))
+
+        image_final.save("ball{:02}.png".format(i + 1))
 
 
 if __name__ == "__main__":

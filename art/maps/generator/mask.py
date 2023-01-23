@@ -62,6 +62,7 @@ def main() -> None:
         color = random.choice(FILLS[1:])
         draw_circle(draw, rad, (x, y), color)
 
+
     image.save(f"{file_name}.png")
 
 
