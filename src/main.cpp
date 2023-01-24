@@ -7,11 +7,11 @@
 #include <sodium.h>
 
 #include "SDL.h"
+#include "SDL_image.h"
+
 #include "imgui.h"
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_sdlrenderer.h"
-
-#include "SDL_image.h"
 
 #include "utils/error_handling.h"
 #include "utils/common.h"
@@ -22,11 +22,11 @@
 
 using namespace std;
 
-#define BALL_TEXT_COUNT 5
-
 #if !SDL_VERSION_ATLEAST(2, 0, 17)
 #error ImGUI requires SDL 2.0.17+ because of SDL_RenderGeometry() function
 #endif
+
+#define BALL_TEXT_COUNT 5
 
 static bool should_record_map = false;
 
@@ -41,6 +41,20 @@ void parse_arguments(const int argc, char **argv) {
             cerr << "The only valid flag is -t for creating a new map" << endl;
             exit(EXIT_FAILURE);
         }
+    }
+}
+
+void render_balls(vector<Ball> &balls, const double counter_for_loc) {
+    if(balls.empty()) {
+        return;
+    }
+    balls[0].move_to_location(counter_for_loc);
+    for(int i = 1; i < int(balls.size()); i++) {
+        const int pos = balls[i - 1].get_previous_ball_pos();
+        balls[i].move_to_location(pos);
+    }
+    for(int i = 0; i < int(balls.size()); i++) {
+        balls[i].draw_ball();
     }
 }
 
@@ -61,10 +75,12 @@ int main(int argc, char **argv)
 
     SDL_Texture *gun_texture;
     SDL_Texture *map_texture;
+    SDL_Texture *background_texture;
 
     vector<SDL_Texture*> ball_textures;
-    vector<pair<int,int>> locations;
     vector<Ball> balls;
+    vector<pii> locations;
+    vector<pii> recorded_locations;
 
     /*
     reading existing road -> (the first line of the "locations_file.txt"
@@ -109,9 +125,7 @@ int main(int argc, char **argv)
 
     // Init video, timer and audio subsystems. Other subsystems like event are
     // initialized automatically by these options.
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_AUDIO | SDL_INIT_TIMER) < 0)
-   
-    {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0){
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
             "Couldn't initialize SDL: %s",
             SDL_GetError()
@@ -120,8 +134,7 @@ int main(int argc, char **argv)
     }
 
     music_player = new MusicPlayer();
-    if (!INIT_SUCCESS(*music_player))
-    {
+    if (!INIT_SUCCESS(*music_player)){
         return 1;
     }
 
@@ -144,21 +157,22 @@ int main(int argc, char **argv)
 
     // setup and initialize sdl2_image library
     {
-        int flag_IMG = IMG_INIT_PNG;
+        int flag_IMG = IMG_INIT_PNG | IMG_INIT_JPG;
         int IMG_init_status = IMG_Init(flag_IMG);
-        if ((IMG_init_status & flag_IMG) != flag_IMG)
-        {
-            cerr << "sdl2image format not available" << endl;
+        if ((IMG_init_status & flag_IMG) != flag_IMG){
+            cerr << "Required formats for SDL2Image where not initialized" << endl;
+            return 3;
         }
     }
 
     music_player->play_music(0); // Start from the first music
-    SDL_Surface *background_01 = IMG_Load("../art/images/ground_02.jpg");
-    SDL_Texture *background_01_tex = SDL_CreateTextureFromSurface(renderer, background_01);
-    if (!(background_01 || background_01_tex))
     {
-        SDL_ShowSimpleMessageBox(0, "background init error", SDL_GetError(), window);
-        return 1;
+        SDL_Surface *background_01 = IMG_Load("../art/images/ground_02.jpg");
+        background_texture = SDL_CreateTextureFromSurface(renderer, background_01);
+        if(!background_texture) {
+            cerr << "Failed to create background texture" << endl;
+            return 2;
+        }
     }
     for(int i = 1; i <= BALL_TEXT_COUNT; i++) {
         snprintf(buf, 90, "../art/images/ball%02d.png", i);
@@ -175,6 +189,7 @@ int main(int argc, char **argv)
         gun_image = IMG_Load("../art/images/gun01.png");
         gun_texture = SDL_CreateTextureFromSurface(renderer, gun_image);
     }
+    // TODO: I move me to a dedicated function
     {
         UID(color_gen, 0, ball_textures.size() - 1);
         for(int i = 0; i < 20; i++) {
@@ -217,12 +232,15 @@ int main(int argc, char **argv)
             case SDL_MOUSEMOTION:
                 last_mouse_pos = {event.motion.x, event.motion.y};
                 break;
+
             case SDL_MOUSEBUTTONDOWN:
                 if(should_record_map && i_want_new_map == 1){
                     new_map_location << event.motion.x << " " << event.motion.y << endl;//making new map if you want new map;
+                    recorded_locations.emplace_back(event.motion.x, event.motion.y);
                 }
                 the_line_color = {255, 0, 255, 255};
                 break;
+
             case SDL_MOUSEBUTTONUP:
                 the_line_color = {30, 0, 255, 255};
                 break;
@@ -243,6 +261,13 @@ int main(int argc, char **argv)
                 break;
             }    
         }
+        curr_time = (s64) SDL_GetTicks64();
+        {
+            double dt = curr_time - prev_time;
+            dt /= 1000; // dt is now in seconds
+            counter_for_loc += 2.0 * dt * 100; // move 2 locations forward every 100ms
+        }
+
         ImGui_ImplSDLRenderer_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
@@ -267,32 +292,30 @@ int main(int argc, char **argv)
 
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff); // sets the background color
         SDL_RenderClear(renderer);
-        SDL_RenderCopy(renderer, background_01_tex, NULL, NULL);
+        SDL_RenderCopy(renderer, background_texture, NULL, NULL);
         SDL_RenderCopy(renderer, map_texture, NULL, NULL);
         SDL_SetRenderDrawColor(renderer, the_line_color.r, the_line_color.g, the_line_color.b, 0xff);
         SDL_RenderDrawLine(renderer,
                            SCREEN_W >> 1, SCREEN_H >> 1,
                            last_mouse_pos.first, last_mouse_pos.second);
 
-        ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());
-
         pdd diff = last_mouse_pos - center;
         const double phase = vector_phase(diff) + (PI / 2.0);
         SDL_RenderCopyEx(renderer, gun_texture, NULL, &gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);//rotate and show wepon
-        balls[0].move_to_location(counter_for_loc);
-        for(int i = 1; i < int(balls.size()); i++) {
-            const int pos = balls[i - 1].get_previous_ball_pos();
-            balls[i].move_to_location(pos);
-        }
-        for(int i = 0; i < int(balls.size()); i++) {
-            balls[i].draw_ball();
-        }
+
+        render_balls(balls, counter_for_loc);
+
+        ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());
+
         prev_time = curr_time;
+
         SDL_RenderPresent(renderer);
     }
-    SDL_FreeSurface(background_01);
-    SDL_DestroyTexture(background_01_tex);
+    SDL_DestroyTexture(background_texture);
     SDL_DestroyTexture(gun_texture);
+    for(auto &txt:ball_textures) {
+        SDL_DestroyTexture(txt);
+    }
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     IMG_Quit();
