@@ -91,10 +91,11 @@ int main(int argc, char **argv)
     ofstream new_map_location;
 
     map_file.open("../art/maps/map01.txt");
-    int i_want_new_map = 0;
-    int number_of_coordinates = 0;
+    bool continue_creating_new_map = false;
     {
+        int number_of_coordinates = 0;
         int is_map_available;
+
         map_file >> is_map_available;
         if(is_map_available == 1){
             map_file >> number_of_coordinates;
@@ -165,7 +166,7 @@ int main(int argc, char **argv)
         }
     }
 
-    music_player->play_music(0); // Start from the first music
+    //music_player->play_music(0); // Start from the first music
     {
         SDL_Surface *background_01 = IMG_Load("../art/images/ground_02.jpg");
         background_texture = SDL_CreateTextureFromSurface(renderer, background_01);
@@ -216,13 +217,14 @@ int main(int argc, char **argv)
     //uncomment if want new road; 
     if(should_record_map){
         new_map_location.open("../art/maps/generator/new_locations_file.txt", ios::out);
-        i_want_new_map = 1;
+        continue_creating_new_map = true;
     }
 
     while (!should_quit)
     {
         while (!should_quit && SDL_PollEvent(&event))
         {
+            ImGui_ImplSDL2_ProcessEvent(&event);
             switch (event.type)
             {
             case SDL_QUIT:
@@ -234,7 +236,7 @@ int main(int argc, char **argv)
                 break;
 
             case SDL_MOUSEBUTTONDOWN:
-                if(should_record_map && i_want_new_map == 1){
+                if(should_record_map && continue_creating_new_map && !io.WantCaptureMouse){
                     new_map_location << event.motion.x << " " << event.motion.y << endl;//making new map if you want new map;
                     recorded_locations.emplace_back(event.motion.x, event.motion.y);
                 }
@@ -246,9 +248,9 @@ int main(int argc, char **argv)
                 break;
 
             case SDL_KEYDOWN:
-                if(event.key.keysym.sym == SDLK_SPACE){
+                if(event.key.keysym.sym == SDLK_SPACE && !io.WantCaptureKeyboard){
                     the_line_color = {255, 0, 255, 255};
-                    i_want_new_map = 0;
+                    continue_creating_new_map = false;
                     cerr << "I stopped recording coordinates!" << endl;
                 }
                 break;
@@ -272,7 +274,7 @@ int main(int argc, char **argv)
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        {
+        if(!should_record_map) {
             static int counter = 0;
 
             ImGui::Begin("Settings");
@@ -285,6 +287,19 @@ int main(int argc, char **argv)
             ImGui::Text("Counter = %d", counter);
             ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
             draw_users_table(users);
+            ImGui::End();
+        } else {
+            ImGui::Begin("New Map");
+            ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
+            ImGui::Text("Current mouse position: (%04d, %04d)",
+                (int)last_mouse_pos.first, (int)last_mouse_pos.second);
+
+            ImGui::Text("Previous locations:");
+            ImGui::Indent(10.0);
+            for(const auto &[x, y]:recorded_locations) {
+                ImGui::Text("(%04d, %04d)", x, y);
+            }
+            ImGui::Unindent(10.0);
             ImGui::End();
         }
 
@@ -311,11 +326,14 @@ int main(int argc, char **argv)
 
         SDL_RenderPresent(renderer);
     }
+
     SDL_DestroyTexture(background_texture);
     SDL_DestroyTexture(gun_texture);
+
     for(auto &txt:ball_textures) {
         SDL_DestroyTexture(txt);
     }
+
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     IMG_Quit();
