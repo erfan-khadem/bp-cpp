@@ -266,7 +266,7 @@ int main(int argc, char **argv)
         curr_time = (s64) SDL_GetTicks64();
         {
             double dt = curr_time - prev_time;
-            dt /= 1000; // dt is now in seconds
+            dt /= 1000; // dt should be in seconds
             counter_for_loc += 2.0 * dt * 100; // move 2 locations forward every 100ms
         }
 
