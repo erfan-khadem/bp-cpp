@@ -12,6 +12,7 @@
 #include "utils/common.h"
 #include "music-player.h"
 #include "ball.hpp"
+#include "shelik.hpp"
 
 using namespace std;
 
@@ -39,10 +40,13 @@ int main(int argc, char **argv)
 
     char buf[100];
     double counter_for_loc = 0;  
-
+    double counter_for_firedball = 0;
     s64 prev_time = 0;
     s64 curr_time = 0;
 
+    vector<int> Dx;
+    vector<int> Dy;
+    vector <int> diff_cntrloc;
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Event event;
@@ -54,6 +58,7 @@ int main(int argc, char **argv)
     vector<SDL_Texture*> ball_textures;
     vector<pair<int,int>> locations;
     vector<Ball> balls;
+    vector<Shelik> fired_balls;
 
     /*
     reading existing road -> (the first line of the "locations_file.txt"
@@ -181,8 +186,13 @@ int main(int argc, char **argv)
                 break;
             case SDL_MOUSEBUTTONDOWN:
                 if(should_record_map && i_want_new_map == 1){
-                    new_map_location << event.motion.x << " " << event.motion.y << endl;//making new map if you want new map;
+                    new_map_location << event.motion.x << " " << event.motion.y << endl;//making new map if you want new map; 
                 }
+                fired_balls.emplace_back(3, ball_textures[3], renderer);
+                Dx.insert(Dx.begin() ,last_mouse_pos.first - center.first);
+                Dy.insert(Dy.begin(),last_mouse_pos.second - center.second);
+                diff_cntrloc.insert(diff_cntrloc.begin() , counter_for_firedball);
+                fired_balls[fired_balls.size()-1].diff_cntrloc = counter_for_firedball;
                 the_line_color = {255, 0, 255, 255};
                 break;
             case SDL_MOUSEBUTTONUP:
@@ -206,10 +216,11 @@ int main(int argc, char **argv)
             }    
         }
         curr_time = (s64) SDL_GetTicks64();
+        double dt = curr_time - prev_time;
+        counter_for_firedball += 10 * dt/1000 * 100;
         if(counter_for_loc < locations.size()){
-            double dt = curr_time - prev_time;
             dt /= 1000;
-            counter_for_loc += 2 * dt * 100; // 2 positions every 100ms
+            counter_for_loc += .5 * dt * 100; // 2 positions every 100ms
         }
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff); // sets the background color
         SDL_RenderClear(renderer);
@@ -223,12 +234,35 @@ int main(int argc, char **argv)
         const double phase = vector_phase(diff) + (PI / 2.0);
         SDL_RenderCopyEx(renderer, gun_texture, NULL, &gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);//rotate and show wepon
         balls[0].move_to_location(counter_for_loc);
+        for (int i = 0; i < int(fired_balls.size()); i++)
+        {
+            fired_balls[i].move_to_location(counter_for_firedball , Dy[i] , Dx[i] , diff_cntrloc[i]);
+        }
+        for(int i = 0; i < int(fired_balls.size()); i++) {
+            fired_balls[i].draw_fired_ball();
+        }
         for(int i = 1; i < int(balls.size()); i++) {
             const int pos = balls[i - 1].get_previous_ball_pos();
             balls[i].move_to_location(pos);
         }
         for(int i = 0; i < int(balls.size()); i++) {
             balls[i].draw_ball();
+        }
+        for(int i = 0; i < int(balls.size()); i++) {
+            if(fired_balls.size()>0){
+            if(balls[i].iscolided(fired_balls[0].position)){       
+                if(balls[i].ball_color == fired_balls[0].ball_color){
+                    cout<<balls[i].iscolided(fired_balls[0].position)<<endl;    
+                    fired_balls.erase(fired_balls.begin());
+                    balls.erase(balls.begin()+i);
+                    cout<<i<<endl;
+                    break;
+                }
+                else{
+                    
+                }
+            }
+          }
         }
         prev_time = curr_time;
         SDL_RenderPresent(renderer);

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "utils/common.h"
-
+#include "utils/phase.hpp"
 #include "SDL.h"
 #include "SDL_image.h"
 
@@ -80,8 +80,23 @@ public:
         position.x = locations->at(pos).first;
         position.y = locations->at(pos).second;
     }
-
-
+    int iscolided(SDL_Rect fired_ball_rect){
+        pair<double , double> a;
+        pair<double , double> b; 
+        if((fired_ball_rect.x - position.x)*(fired_ball_rect.x - position.x) + (fired_ball_rect.y - position.y)*(fired_ball_rect.y - position.y) < sq_2x_radius){
+            a = {fired_ball_rect.x - SCREEN_W>>1 , fired_ball_rect.y - SCREEN_H>>1};
+            b = {position.x - SCREEN_W>>1 , position.y - SCREEN_H>>1};
+            if(vector_phase(b)<vector_phase(a)){
+                return 1;
+            }
+            else{
+                return -1;
+            }
+        }
+        else{
+            return 0;
+        }
+    }
     void draw_ball() {
         draw_position = position;
         draw_position.x -= position.h >> 1;
