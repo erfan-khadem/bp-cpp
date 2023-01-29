@@ -37,7 +37,7 @@ void parse_arguments(const int argc, char **argv) {
 int main(int argc, char **argv)
 {
     parse_arguments(argc, argv);
-
+    srand(time(NULL));
     char buf[100];
     double counter_for_loc = 0;  
     double counter_for_firedball = 0;
@@ -47,6 +47,7 @@ int main(int argc, char **argv)
     vector<int> Dx;
     vector<int> Dy;
     vector <int> diff_cntrloc;
+    int rand_forfireball;
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Event event;
@@ -188,11 +189,13 @@ int main(int argc, char **argv)
                 if(should_record_map && i_want_new_map == 1){
                     new_map_location << event.motion.x << " " << event.motion.y << endl;//making new map if you want new map; 
                 }
-                fired_balls.emplace_back(3, ball_textures[3], renderer);
-                Dx.insert(Dx.begin() ,last_mouse_pos.first - center.first);
-                Dy.insert(Dy.begin(),last_mouse_pos.second - center.second);
-                diff_cntrloc.insert(diff_cntrloc.begin() , counter_for_firedball);
-                fired_balls[fired_balls.size()-1].diff_cntrloc = counter_for_firedball;
+                rand_forfireball = rand()%5;
+                cout<<".."<<rand_forfireball<<".."<<endl;
+                fired_balls.emplace_back(rand_forfireball, ball_textures[rand_forfireball], renderer);
+                Dx.push_back(last_mouse_pos.first - center.first);
+                Dy.push_back(last_mouse_pos.second - center.second);
+                diff_cntrloc.push_back(counter_for_firedball);
+                fired_balls.rbegin()->diff_cntrloc = counter_for_firedball;
                 the_line_color = {255, 0, 255, 255};
                 break;
             case SDL_MOUSEBUTTONUP:
@@ -216,11 +219,11 @@ int main(int argc, char **argv)
             }    
         }
         curr_time = (s64) SDL_GetTicks64();
-        double dt = curr_time - prev_time;
-        counter_for_firedball += 10 * dt/1000 * 100;
+        double dt = double(curr_time - prev_time) / 1000.0;
+        counter_for_firedball += 5 * dt * 100;
+
         if(counter_for_loc < locations.size()){
-            dt /= 1000;
-            counter_for_loc += .5 * dt * 100; // 2 positions every 100ms
+            counter_for_loc +=  1 * dt * 100; // 1 positions every 100ms
         }
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff); // sets the background color
         SDL_RenderClear(renderer);
@@ -253,13 +256,11 @@ int main(int argc, char **argv)
             if(balls[i].iscolided(fired_balls[0].position)){       
                 if(balls[i].ball_color == fired_balls[0].ball_color){
                     cout<<balls[i].iscolided(fired_balls[0].position)<<endl;    
-                    fired_balls.erase(fired_balls.begin());
                     balls.erase(balls.begin()+i);
                     cout<<i<<endl;
-                    break;
                 }
                 else{
-                    
+                    fired_balls.erase(fired_balls.begin());
                 }
             }
           }

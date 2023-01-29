@@ -41,8 +41,9 @@ public:
 
     void move_to_location(int pos,const int Dy,const int Dx , int diff) {
         pos -= diff;
-        position.x = pos*Dx/200 + SCREEN_W >> 1;
-        position.y = int(pos*Dy/200) + SCREEN_H >> 1;
+        int vector_len = sqrt(Dx*Dx + Dy*Dy);
+        position.x = pos*Dx/vector_len*5 + SCREEN_W >> 1;
+        position.y = pos*Dy/vector_len*5 + SCREEN_H >> 1;
         if(position.x>1000 || position.x < 0 || position.y>500 || position.y<0){
             should_render = true;
         }
