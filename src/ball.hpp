@@ -1,13 +1,22 @@
 #pragma once
 
+#include <map>
+
 #include "utils/common.h"
 
 #include "SDL.h"
 #include "SDL_image.h"
 
+using std::map;
+
 #define BALL_SIZE 64
 
 static const double sq_2x_radius = BALL_SIZE * BALL_SIZE;
+
+typedef const vector<pii>* PointerType;
+
+map<PointerType, s64> address_users;
+map<PointerType, vector<int>> calc_prev;
 
 class Ball{
 public:
@@ -18,15 +27,14 @@ public:
     SDL_Rect position;
     SDL_Rect draw_position;
 
-    SDL_Surface* surface;
     SDL_Texture* ball_txt;
     SDL_Renderer* renderer;
 
-    vector<pii> *locations;
+    const vector<pii> *locations;
 
     char buf[100];
 
-    Ball(const int _ball_color, SDL_Texture* cache_txt, SDL_Renderer* rend, vector<pii>* const _locs){
+    Ball(const int _ball_color, SDL_Texture* cache_txt, SDL_Renderer* rend, const vector<pii>* const _locs){
         loc_index = 0;
         locations = _locs;
         ball_color = _ball_color;
@@ -34,8 +42,7 @@ public:
         renderer = rend;
         if(cache_txt == nullptr) {
             snprintf(buf, 90, "../art/images/ball%02d.png", ball_color);
-            surface = IMG_Load(buf);
-            ball_txt = SDL_CreateTextureFromSurface(renderer, surface);
+            ball_txt = IMG_LoadTexture(renderer, buf);
         } else {
             ball_txt = cache_txt;
         }
@@ -43,6 +50,19 @@ public:
         position.w = 1.25 * BALL_SIZE;
         position.x = locations->at(loc_index).first;
         position.y = locations->at(loc_index).second;
+
+        if(address_users.find(locations) == address_users.end()) {
+            address_users[locations] = 0;
+        }
+
+        address_users[locations]++;
+    }
+    
+    ~Ball() {
+        // DO NOT destroy ball_texture!
+        if((--address_users[locations]) == 0){
+            calc_prev.erase(calc_prev.find(locations));
+        }
     }
 
     pii get_center() const {
@@ -57,14 +77,22 @@ public:
         if(!should_render) {
             return -1;
         }
+        auto &vec = calc_prev[locations];
+        if(int(vec.size()) > cpos && vec[cpos] != -2) {
+            return vec[cpos];
+        }
+        if(cpos >= (int)vec.size())
+            vec.resize(cpos + 1, -2);
 
         const auto pos = pii{position.x, position.y};
 
         for(int i = cpos - 1; i >= 0; i--) {
             if(square_euclid_dist(locations->at(i), pos) >= sq_2x_radius){
+                vec[cpos] = i;
                 return i;
             }
         }
+        vec[cpos] = -1;
         return -1;
     }
 
@@ -89,9 +117,5 @@ public:
         if(should_render){
             SDL_RenderCopy(renderer , ball_txt, NULL , &draw_position);
         }
-    }
-
-    ~Ball(){
-        // Surface and ball_txt shall not be free'd here!
     }
 };

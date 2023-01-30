@@ -34,12 +34,12 @@ MusicPlayer::MusicPlayer(){
         return;
     }
     // Add in game music files in here
+    regex str_expr ("^music-(.*)$");
     for(const auto &entry: filesystem::directory_iterator(MUSIC_PATH)){
         if (!entry.is_regular_file()) {
             continue;
         }
         string name = entry.path().filename();
-        regex str_expr ("^music-(.*)$");
         if (regex_match(name.begin(), name.end(), str_expr)) {
             in_game_music.push_back(name);
         }

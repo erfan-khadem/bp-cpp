@@ -35,30 +35,38 @@ class Map {
 public:
     int num_points;
 
+    SDL_Renderer *rend;
+
     string path_name;
     string background_name;
 
+    string locs_path;
+    string path_path;
+    string bkg_path;
+
     vector<pii> locations;
 
-    SDL_Renderer *rend;
     SDL_Texture *path_txt;
     SDL_Texture *background_txt;
 
-    Map(const string &_path_name, const string &_bkg_name, SDL_Renderer* const _renderer) {
-        rend = _renderer;
-        path_name = _path_name;
-        background_name = _bkg_name;
+    Map(const string &_path_name, const string &_bkg_name, SDL_Renderer* const _renderer)
+    : rend(_renderer), path_name(_path_name), background_name(_bkg_name){
 
         normalize_name(path_name);
         normalize_name(background_name);
 
-        path_txt = IMG_LoadTexture(rend, (MAPS_PATH + _path_name + ".png").c_str());
-        background_txt = IMG_LoadTexture(rend, (MAPS_PATH + _bkg_name + ".png").c_str());
+        path_path = MAPS_PATH + _path_name + ".png";
+        bkg_path = MAPS_PATH + _bkg_name + ".png";
+
+        path_txt = IMG_LoadTexture(rend, path_path.c_str());
+        background_txt = IMG_LoadTexture(rend, bkg_path.c_str());
 
         assert(path_txt != nullptr);
         assert(background_txt != nullptr);
 
-        ifstream map_file(MAPS_PATH + _path_name + ".txt");
+        locs_path = MAPS_PATH + _path_name + ".txt";
+
+        ifstream map_file(locs_path);
         assert(map_file.is_open());
         {
             int number_of_coordinates = 0;
@@ -76,7 +84,6 @@ public:
             }
             map_file.close();
         }
-        map_file.close();
         num_points = locations.size();
     }
     ~Map() {
@@ -90,8 +97,8 @@ public:
     }
 };
 
-vector<Map> get_all_maps(SDL_Renderer *rend) {
-    vector<Map> result;
+vector<Map*> get_all_maps(SDL_Renderer *rend) {
+    vector<Map*> result;
     regex str_expr ("^map-(.*)\\.txt$");
     for(const auto &entry: std::filesystem::directory_iterator(MAPS_PATH)) {
         if(!entry.is_regular_file()) {
@@ -101,7 +108,7 @@ vector<Map> get_all_maps(SDL_Renderer *rend) {
         if (regex_match(name.begin(), name.end(), str_expr)) {
             strip_format(name);
             string bkg_name = "background" + name.substr(3);
-            result.emplace_back(name, bkg_name, rend);
+            result.push_back(new Map(name, bkg_name, rend));
         }
     }
     return result;

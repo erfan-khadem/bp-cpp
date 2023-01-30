@@ -19,6 +19,8 @@
 #include "ball.hpp"
 #include "user.h"
 #include "draw_users_table.hpp"
+#include "map.hpp"
+#include "scheduler.hpp"
 
 using namespace std;
 
@@ -44,17 +46,17 @@ void parse_arguments(const int argc, char **argv) {
     }
 }
 
-void render_balls(vector<Ball> &balls, const double counter_for_loc) {
+void render_balls(vector<Ball*> &balls, const double map_location) {
     if(balls.empty()) {
         return;
     }
-    balls[0].move_to_location(counter_for_loc);
+    balls[0]->move_to_location(map_location);
     for(int i = 1; i < int(balls.size()); i++) {
-        const int pos = balls[i - 1].get_previous_ball_pos();
-        balls[i].move_to_location(pos);
+        const int pos = balls[i - 1]->get_previous_ball_pos();
+        balls[i]->move_to_location(pos);
     }
     for(int i = 0; i < int(balls.size()); i++) {
-        balls[i].draw_ball();
+        balls[i]->draw_ball();
     }
 }
 
@@ -63,7 +65,8 @@ int main(int argc, char **argv)
     parse_arguments(argc, argv);
 
     char buf[100];
-    double counter_for_loc = 0;  
+    int selected_map = 1;
+    double map_location = 0;  
 
     s64 prev_time = 0;
     s64 curr_time = 0;
@@ -74,51 +77,23 @@ int main(int argc, char **argv)
     SDL_Rect gun_rect = {.x=600, .y=320, .w=80, .h=160};
 
     SDL_Texture *gun_texture;
-    SDL_Texture *map_texture;
-    SDL_Texture *background_texture;
 
     vector<SDL_Texture*> ball_textures;
-    vector<Ball> balls;
-    vector<pii> locations;
-    vector<pii> recorded_locations;
-
-    /*
-    reading existing road -> (the first line of the "locations_file.txt"
-    shows the existence of road , second line is number of coordinates);
-    if you made new road , add "1" and number of coordinates.
-    */
-    ifstream map_file;
-    ofstream new_map_location;
-
-    map_file.open("../art/maps/map01.txt");
-    bool continue_creating_new_map = false;
-    {
-        int number_of_coordinates = 0;
-        int is_map_available;
-
-        map_file >> is_map_available;
-        if(is_map_available == 1){
-            map_file >> number_of_coordinates;
-            for (int i = 0; i < number_of_coordinates;i++)
-            {
-                int x, y;
-                map_file >> x >> y;
-                locations.emplace_back(x,y);
-            }
-        }
-    }
-    map_file.close();
+    vector<Map*> maps;
+    vector<Ball*> balls;
 
     MusicPlayer *music_player = nullptr;
+    NewMap *new_map = nullptr;
+    Map *curr_map = nullptr;
     UserMap users = get_user_list();
 
     // TODO: Delete me!
-    pdd last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1};// Do not change!
+    pdd last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1}; // Do not change!
     SDL_Color the_line_color = {30, 0, 255, 255};
 
     const pdd center = last_mouse_pos;
 
-
+    // --- Starting Initialization!
     if (sodium_init() < 0) {
         cerr << "Could not initialize libsodium, quiting" << endl;
         return 1;
@@ -139,7 +114,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Use OpenGL acceleration and allow High-DPI for ImGUI
+
+    // Force OpenGL acceleration and allow High-DPI for ImGUI
     window = SDL_CreateWindow("BP-cpp",
                               SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               SCREEN_W, SCREEN_H,
@@ -165,37 +141,35 @@ int main(int argc, char **argv)
             return 3;
         }
     }
+    // --- Initialization Done!
 
-    //music_player->play_music(0); // Start from the first music
-    {
-        SDL_Surface *background_01 = IMG_Load("../art/images/ground_02.jpg");
-        background_texture = SDL_CreateTextureFromSurface(renderer, background_01);
-        if(!background_texture) {
-            cerr << "Failed to create background texture" << endl;
-            return 2;
-        }
+    if(should_record_map) {
+        cerr << "I want to record a new map!" << endl;
+        new_map = new NewMap(renderer);
     }
+
+    //TODO: remove this comment, let's play some music!
+    //music_player->play_music(0); // Start from the first music
+
+    maps = get_all_maps(renderer);
+
+    //TODO: Do this properly!
+    curr_map = maps.at(selected_map);
+
     for(int i = 1; i <= BALL_TEXT_COUNT; i++) {
         snprintf(buf, 90, "../art/images/ball%02d.png", i);
-        auto surf = IMG_Load(buf);
-        ball_textures.push_back(SDL_CreateTextureFromSurface(renderer, surf));
+        ball_textures.push_back(IMG_LoadTexture(renderer, buf));
         assert(ball_textures.back() != nullptr);
     }
-    {
-        auto surf = IMG_Load("../art/maps/map01.png");
-        map_texture = SDL_CreateTextureFromSurface(renderer, surf);
-    }
-    {
-        SDL_Surface *gun_image;
-        gun_image = IMG_Load("../art/images/gun01.png");
-        gun_texture = SDL_CreateTextureFromSurface(renderer, gun_image);
-    }
+
+    gun_texture = IMG_LoadTexture(renderer, "../art/images/gun01.png");
+    assert(gun_texture != nullptr);
     // TODO: I move me to a dedicated function
     {
         UID(color_gen, 0, ball_textures.size() - 1);
         for(int i = 0; i < 20; i++) {
             const int ball_color = color_gen(rng);
-            balls.emplace_back(ball_color, ball_textures[ball_color], renderer, &locations);
+            balls.push_back(new Ball(ball_color, ball_textures.at(ball_color), renderer, &(curr_map->locations)));
         }
     }
     // Now let's setup ImGUI:
@@ -213,12 +187,6 @@ int main(int argc, char **argv)
     io.Fonts->AddFontFromFileTTF("../art/fonts/roboto-medium.ttf", 20.0f);
 
     bool should_quit = false;
-    
-    //uncomment if want new road; 
-    if(should_record_map){
-        new_map_location.open("../art/maps/generator/new_locations_file.txt", ios::out);
-        continue_creating_new_map = true;
-    }
 
     while (!should_quit)
     {
@@ -236,9 +204,8 @@ int main(int argc, char **argv)
                 break;
 
             case SDL_MOUSEBUTTONDOWN:
-                if(should_record_map && continue_creating_new_map && !io.WantCaptureMouse){
-                    new_map_location << event.motion.x << " " << event.motion.y << endl;//making new map if you want new map;
-                    recorded_locations.emplace_back(event.motion.x, event.motion.y);
+                if(should_record_map && !io.WantCaptureMouse){
+                    new_map->add_point(last_mouse_pos);
                 }
                 the_line_color = {255, 0, 255, 255};
                 break;
@@ -248,10 +215,10 @@ int main(int argc, char **argv)
                 break;
 
             case SDL_KEYDOWN:
-                if(event.key.keysym.sym == SDLK_SPACE && !io.WantCaptureKeyboard){
+                if(event.key.keysym.sym == SDLK_SPACE && should_record_map && !io.WantCaptureKeyboard){
                     the_line_color = {255, 0, 255, 255};
-                    continue_creating_new_map = false;
                     cerr << "I stopped recording coordinates!" << endl;
+                    should_quit = true;
                 }
                 break;
 
@@ -267,8 +234,9 @@ int main(int argc, char **argv)
         {
             double dt = curr_time - prev_time;
             dt /= 1000; // dt should be in seconds
-            counter_for_loc += 2.0 * dt * 100; // move 2 locations forward every 100ms
+            map_location += 1.0 * dt * 100; // move 2 locations forward every 100ms
         }
+        Scheduler::run(curr_time);
 
         ImGui_ImplSDLRenderer_NewFrame();
         ImGui_ImplSDL2_NewFrame();
@@ -288,27 +256,15 @@ int main(int argc, char **argv)
             ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
             draw_users_table(users);
             ImGui::End();
-        } else {
-            ImGui::Begin("New Map");
-            ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
-            ImGui::Text("Current mouse position: (%04d, %04d)",
-                (int)last_mouse_pos.first, (int)last_mouse_pos.second);
-
-            ImGui::Text("Previous locations:");
-            ImGui::Indent(10.0);
-            for(const auto &[x, y]:recorded_locations) {
-                ImGui::Text("(%04d, %04d)", x, y);
-            }
-            ImGui::Unindent(10.0);
-            ImGui::End();
         }
 
         ImGui::Render();
 
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff); // sets the background color
         SDL_RenderClear(renderer);
-        SDL_RenderCopy(renderer, background_texture, NULL, NULL);
-        SDL_RenderCopy(renderer, map_texture, NULL, NULL);
+
+        curr_map->draw_background();
+
         SDL_SetRenderDrawColor(renderer, the_line_color.r, the_line_color.g, the_line_color.b, 0xff);
         SDL_RenderDrawLine(renderer,
                            SCREEN_W >> 1, SCREEN_H >> 1,
@@ -318,7 +274,11 @@ int main(int argc, char **argv)
         const double phase = vector_phase(diff) + (PI / 2.0);
         SDL_RenderCopyEx(renderer, gun_texture, NULL, &gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);//rotate and show wepon
 
-        render_balls(balls, counter_for_loc);
+        render_balls(balls, map_location);
+
+        if(should_record_map) {
+            new_map->draw_status(last_mouse_pos);
+        }
 
         ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());
 
@@ -327,7 +287,14 @@ int main(int argc, char **argv)
         SDL_RenderPresent(renderer);
     }
 
-    SDL_DestroyTexture(background_texture);
+    if(new_map != nullptr) {
+        delete new_map;
+    }
+
+    for(auto &x:maps) {
+        delete x;
+    }
+
     SDL_DestroyTexture(gun_texture);
 
     for(auto &txt:ball_textures) {

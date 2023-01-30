@@ -31,9 +31,15 @@ def draw_circle(draw: ImageDraw, radius: int, center: tuple[int, int], fill: str
 
 
 def main() -> None:
+    if len(sys.argv) != 3:
+        print(f"Usage: {sys.argv[0]} input-file.txt output-file.png")
+        sys.exit(1)
+
+    input_name = sys.argv[1]
+    output_name = sys.argv[2]
+
     center_of_path = []
-    file_name = sys.argv[1]
-    with open(file_name + ".txt", "r") as f:
+    with open(input_name, "r") as f:
         data = f.read().split()
         data = data[2:]
         data = map(int, data)
@@ -63,7 +69,7 @@ def main() -> None:
         draw_circle(draw, rad, (x, y), color)
 
 
-    image.save(f"{file_name}.png")
+    image.save(output_name)
 
 
 if __name__ == "__main__":

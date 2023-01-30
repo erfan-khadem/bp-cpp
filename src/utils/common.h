@@ -16,6 +16,9 @@
 #define DEG_TO_RAD ((double)3.141592653589793 / (double)180.0)
 #define PI ((double)3.141592653589793)
 
+#define RENDER_COLOR(rd, col) SDL_SetRenderDrawColor( \
+        (rd), (col).r, (col).g, (col).b, (col).a);
+
 using std::cerr;
 using std::cout;
 using std::endl;

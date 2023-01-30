@@ -18,5 +18,6 @@ string format_utc_time(time_t tval)
     strftime(&result[0], 28, "%F %T", tm_res);
     auto nb = result.begin() + result.find('\0');
     result.erase(nb, result.end());
+    free(tm_res);
     return result;
 }
