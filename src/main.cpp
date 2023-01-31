@@ -29,6 +29,7 @@ using namespace std;
 #endif
 
 #define BALL_TEXT_COUNT 5
+#define SPEED_FACTOR 1.0
 
 static bool should_record_map = false;
 
@@ -46,14 +47,19 @@ void parse_arguments(const int argc, char **argv) {
     }
 }
 
-void render_balls(vector<Ball*> &balls, const double map_location) {
+void render_balls(vector<Ball*> &balls, const double step, const double map_location) {
     if(balls.empty()) {
         return;
     }
     balls[0]->move_to_location(map_location);
     for(int i = 1; i < int(balls.size()); i++) {
-        const int pos = balls[i - 1]->get_previous_ball_pos();
-        balls[i]->move_to_location(pos);
+        if(balls[i]->should_render){
+            double new_pos = balls[i]->loc_index + step;
+            balls[i]->move_to_location(new_pos);
+        } else {
+            const double pos = balls[i - 1]->get_previous_ball_pos();
+            balls[i]->move_to_location(pos);
+        }
     }
     for(int i = 0; i < int(balls.size()); i++) {
         balls[i]->draw_ball();
@@ -67,6 +73,7 @@ int main(int argc, char **argv)
     char buf[100];
     int selected_map = 1;
     double map_location = 0;  
+    double map_location_step = 0;
 
     s64 prev_time = 0;
     s64 curr_time = 0;
@@ -170,6 +177,9 @@ int main(int argc, char **argv)
         for(int i = 0; i < 20; i++) {
             const int ball_color = color_gen(rng);
             balls.push_back(new Ball(ball_color, ball_textures.at(ball_color), renderer, &(curr_map->locations)));
+            if(i > 0) {
+                balls[i]->should_render = false;
+            }
         }
     }
     // Now let's setup ImGUI:
@@ -234,7 +244,8 @@ int main(int argc, char **argv)
         {
             double dt = curr_time - prev_time;
             dt /= 1000; // dt should be in seconds
-            map_location += 1.0 * dt * 100; // move 2 locations forward every 100ms
+            map_location_step = SPEED_FACTOR * dt * 100;
+            map_location += map_location_step;
         }
         Scheduler::run(curr_time);
 
@@ -274,7 +285,7 @@ int main(int argc, char **argv)
         const double phase = vector_phase(diff) + (PI / 2.0);
         SDL_RenderCopyEx(renderer, gun_texture, NULL, &gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);//rotate and show wepon
 
-        render_balls(balls, map_location);
+        render_balls(balls, map_location_step, map_location);
 
         if(should_record_map) {
             new_map->draw_status(last_mouse_pos);

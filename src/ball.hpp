@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <utility>
 
 #include "utils/common.h"
 
@@ -20,7 +21,7 @@ map<PointerType, vector<int>> calc_prev;
 
 class Ball{
 public:
-    int loc_index;
+    double loc_index;
     int ball_color;
     bool should_render;
 
@@ -35,7 +36,7 @@ public:
     char buf[100];
 
     Ball(const int _ball_color, SDL_Texture* cache_txt, SDL_Renderer* rend, const vector<pii>* const _locs){
-        loc_index = 0;
+        loc_index = 0.0;
         locations = _locs;
         ball_color = _ball_color;
         should_render = true;
@@ -48,8 +49,8 @@ public:
         }
         position.h = 1.25 * BALL_SIZE;
         position.w = 1.25 * BALL_SIZE;
-        position.x = locations->at(loc_index).first;
-        position.y = locations->at(loc_index).second;
+        position.x = locations->at(0).first;
+        position.y = locations->at(0).second;
 
         if(address_users.find(locations) == address_users.end()) {
             address_users[locations] = 0;
@@ -72,14 +73,14 @@ public:
         };
     }
 
-    int get_previous_ball_pos() {
+    double get_previous_ball_pos() {
         const int cpos = loc_index;
         if(!should_render) {
             return -1;
         }
         auto &vec = calc_prev[locations];
         if(int(vec.size()) > cpos && vec[cpos] != -2) {
-            return vec[cpos];
+            return vec[cpos] + loc_index - floor(loc_index);
         }
         if(cpos >= (int)vec.size())
             vec.resize(cpos + 1, -2);
@@ -88,15 +89,15 @@ public:
 
         for(int i = cpos - 1; i >= 0; i--) {
             if(square_euclid_dist(locations->at(i), pos) >= sq_2x_radius){
-                vec[cpos] = i;
-                return i;
+                vec[cpos] = cpos > 0 ? std::max(i, vec[cpos-1]) : i;
+                return vec[cpos] + loc_index - floor(loc_index);
             }
         }
         vec[cpos] = -1;
         return -1;
     }
 
-    void move_to_location(const int pos) {
+    void move_to_location(const double pos) {
         if(pos < 0 || pos >= int(locations->size())) {
             position.x = -1000;
             position.y = -1000;
@@ -105,8 +106,8 @@ public:
         }
         loc_index = pos;
         should_render = true;
-        position.x = locations->at(pos).first;
-        position.y = locations->at(pos).second;
+        position.x = locations->at((int)pos).first;
+        position.y = locations->at((int)pos).second;
     }
 
 
