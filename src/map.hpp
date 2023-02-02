@@ -48,6 +48,7 @@ public:
 
     SDL_Texture *path_txt;
     SDL_Texture *background_txt;
+    SDL_Texture *blended_txt;
 
     Map(const string &_path_name, const string &_bkg_name, SDL_Renderer* const _renderer)
     : rend(_renderer), path_name(_path_name), background_name(_bkg_name){
@@ -60,9 +61,18 @@ public:
 
         path_txt = IMG_LoadTexture(rend, path_path.c_str());
         background_txt = IMG_LoadTexture(rend, bkg_path.c_str());
+        blended_txt = SDL_CreateTexture(rend, SDL_PIXELFORMAT_RGBA8888,
+            SDL_TEXTUREACCESS_TARGET, SCREEN_W, SCREEN_H);
 
         assert(path_txt != nullptr);
         assert(background_txt != nullptr);
+        assert(blended_txt != nullptr);
+
+        assert(SDL_SetRenderTarget(rend, blended_txt) == 0);
+        SDL_RenderCopy(rend, background_txt, NULL, NULL);
+        SDL_SetTextureBlendMode(path_txt, SDL_BLENDMODE_ADD);
+        SDL_RenderCopy(rend, path_txt, NULL, NULL);
+        SDL_SetRenderTarget(rend, NULL);
 
         locs_path = MAPS_PATH + _path_name + ".txt";
 
@@ -89,11 +99,11 @@ public:
     ~Map() {
         SDL_DestroyTexture(path_txt);
         SDL_DestroyTexture(background_txt);
+        SDL_DestroyTexture(blended_txt);
     }
 
     void draw_background() {
-        SDL_RenderCopy(rend, background_txt, NULL, NULL);
-        SDL_RenderCopy(rend, path_txt, NULL, NULL);
+        SDL_RenderCopy(rend, blended_txt, NULL, NULL);
     }
 };
 

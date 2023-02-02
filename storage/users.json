@@ -5,5 +5,12 @@
         "name": "Erfan",
         "pw_hash": "asdfaasdf",
         "register_time": 1673306525
+    },
+    {
+        "max_score": 0,
+        "max_score_time": 1675202033,
+        "name": "erfan\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
+        "pw_hash": "$argon2id$v=19$m=1048576,t=4,p=1$CTfbtEMPAasc03ePIPfgPA$nvmXovajYTpxqHOiaTAFfb5mxaEFvjh0wpBdXz0M72M\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
+        "register_time": 1675202033
     }
 ]

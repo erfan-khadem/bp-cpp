@@ -17,10 +17,12 @@
 #include "utils/common.h"
 #include "music-player.h"
 #include "ball.hpp"
-#include "user.h"
+//#include "user.h"
 #include "draw_users_table.hpp"
 #include "map.hpp"
 #include "scheduler.hpp"
+#include "gui.hpp"
+#include "slideshow.hpp"
 
 using namespace std;
 
@@ -30,6 +32,8 @@ using namespace std;
 
 #define BALL_TEXT_COUNT 5
 #define SPEED_FACTOR 1.0
+#define NUM_BALLS 40
+#define DEBUG true
 
 static bool should_record_map = false;
 
@@ -47,15 +51,18 @@ void parse_arguments(const int argc, char **argv) {
     }
 }
 
-void render_balls(vector<Ball*> &balls, const double step, const double map_location) {
+int render_balls(vector<Ball*> &balls, const double step, const double map_location) {
     if(balls.empty()) {
-        return;
+        return GameStatus::WON;
     }
     balls[0]->move_to_location(map_location);
     for(int i = 1; i < int(balls.size()); i++) {
         if(balls[i]->should_render){
             double new_pos = balls[i]->loc_index + step;
             balls[i]->move_to_location(new_pos);
+            if(balls[i]->should_render == false) {
+                return GameStatus::LOST;
+            }
         } else {
             const double pos = balls[i - 1]->get_previous_ball_pos();
             balls[i]->move_to_location(pos);
@@ -64,6 +71,7 @@ void render_balls(vector<Ball*> &balls, const double step, const double map_loca
     for(int i = 0; i < int(balls.size()); i++) {
         balls[i]->draw_ball();
     }
+    return GameStatus::PLAYING;
 }
 
 int main(int argc, char **argv)
@@ -71,9 +79,16 @@ int main(int argc, char **argv)
     parse_arguments(argc, argv);
 
     char buf[100];
-    int selected_map = 1;
+    int selected_map = 0;
+    int curr_game_status = GameStatus::NOT_STARTED;
     double map_location = 0;  
     double map_location_step = 0;
+
+    bool play_music = true;
+    bool play_sfx = true;
+    bool schedule_game_status = false;
+
+    string maps_combo_choices;
 
     s64 prev_time = 0;
     s64 curr_time = 0;
@@ -93,6 +108,7 @@ int main(int argc, char **argv)
     NewMap *new_map = nullptr;
     Map *curr_map = nullptr;
     UserMap users = get_user_list();
+    User* curr_user = nullptr;
 
     // TODO: Delete me!
     pdd last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1}; // Do not change!
@@ -155,10 +171,15 @@ int main(int argc, char **argv)
         new_map = new NewMap(renderer);
     }
 
-    //TODO: remove this comment, let's play some music!
-    //music_player->play_music(0); // Start from the first music
+    if(play_music){
+        music_player->play_music(0); // Start from the first music
+    }
 
     maps = get_all_maps(renderer);
+    for(auto m:maps) {
+        maps_combo_choices += m->path_name;
+        maps_combo_choices += '\0';
+    }
 
     //TODO: Do this properly!
     curr_map = maps.at(selected_map);
@@ -171,25 +192,24 @@ int main(int argc, char **argv)
 
     gun_texture = IMG_LoadTexture(renderer, "../art/images/gun01.png");
     assert(gun_texture != nullptr);
-    // TODO: I move me to a dedicated function
-    {
-        UID(color_gen, 0, ball_textures.size() - 1);
-        for(int i = 0; i < 20; i++) {
-            const int ball_color = color_gen(rng);
-            balls.push_back(new Ball(ball_color, ball_textures.at(ball_color), renderer, &(curr_map->locations)));
-            if(i > 0) {
-                balls[i]->should_render = false;
-            }
-        }
-    }
+    SlideShow::slides = get_slideshow_images(renderer);
     // Now let's setup ImGUI:
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    ImGui::StyleColorsLight();
+    ImGui::StyleColorsDark();
+    auto &style = ImGui::GetStyle();
+
+    style.WindowRounding = 12.0f;
+    style.FrameRounding = 6.0f;
+    style.ChildRounding = 12.0f;
+    style.PopupRounding = 12.0f;
+    style.GrabRounding = 1.0f;
+
+    style.ItemSpacing = ImVec2(8.0f, 8.0f);
+    style.ItemInnerSpacing = ImVec2(8.0f, 8.0f);
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer_Init(renderer);
@@ -241,9 +261,9 @@ int main(int argc, char **argv)
             }    
         }
         curr_time = (s64) SDL_GetTicks64();
-        {
-            double dt = curr_time - prev_time;
-            dt /= 1000; // dt should be in seconds
+        double dt = curr_time - prev_time;
+        dt /= 1000; // dt should be in seconds
+        if(curr_game_status == GameStatus::PLAYING){
             map_location_step = SPEED_FACTOR * dt * 100;
             map_location += map_location_step;
         }
@@ -253,20 +273,82 @@ int main(int argc, char **argv)
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        if(!should_record_map) {
-            static int counter = 0;
+        if(!should_record_map){
+            if(curr_user == nullptr) {
+                if(DEBUG) {
+                    curr_user = &users.begin()->second;
+                } else {
+                    curr_user = login_or_register(users);
+                }
+            } else {
+                if(curr_game_status == GameStatus::NOT_STARTED) {
+                    ImGui::Begin("Settings", NULL, 0);
+                    ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
+                    if(ImGui::Combo("Select Map", &selected_map, maps_combo_choices.c_str())){
+                        curr_map = maps[selected_map];
+                    }
+                    ImGui::Image((void*)curr_map->blended_txt, ImVec2(SCREEN_W / 4, SCREEN_H / 4));
+                    draw_users_table(users);
 
-            ImGui::Begin("Settings");
-            ImGui::Text("This is some useful text.");
-            if (ImGui::Button("Button"))
-            {
-                counter++;
+                    if(ImGui::Checkbox("Play Music", &play_music)) {
+                        if(play_music) {
+                            music_player->unpause_music();
+                        } else {
+                            music_player->pause_music();
+                        }
+                    }
+
+                    if(ImGui::Checkbox("Play SFX", &play_sfx)) {
+                        if(play_sfx) {
+                            music_player->unpause_sound();
+                        } else {
+                            music_player->pause_sound();
+                        }
+                    }
+
+                    if(ImGui::Button("Start!")) {
+
+                        UID(color_gen, 0, ball_textures.size() - 1);
+                        for(int i = 0; i < NUM_BALLS; i++) {
+                            const int ball_color = color_gen(rng);
+                            balls.push_back(new Ball(ball_color, ball_textures.at(ball_color), renderer, &(curr_map->locations)));
+                            if(i > 0) {
+                                balls[i]->should_render = false;
+                            }
+                        }
+                        map_location = 0;
+                        curr_game_status = GameStatus::PLAYING;
+                    }
+
+                    ImGui::End();
+                } else if(curr_game_status == GameStatus::LOST) {
+                    user_lost();
+                    if(schedule_game_status == false) {
+                        Scheduler::schedule.emplace(
+                            curr_time + 5'000,
+                            [&](const s64 _) {
+                                (void)_;
+                                schedule_game_status = false;
+                                curr_game_status = GameStatus::NOT_STARTED;
+                            }
+                        );
+                        schedule_game_status = true;
+                    }
+                } else if(curr_game_status == GameStatus::WON) {
+                    user_won();
+                    if(schedule_game_status == false) {
+                        Scheduler::schedule.emplace(
+                            curr_time + 5'000,
+                            [&](const s64 _) {
+                                (void)_;
+                                schedule_game_status = false;
+                                curr_game_status = GameStatus::NOT_STARTED;
+                            }
+                        );
+                        schedule_game_status = true;
+                    }
+                }
             }
-            ImGui::SameLine();
-            ImGui::Text("Counter = %d", counter);
-            ImGui::Text("%.1f FPS", ImGui::GetIO().Framerate);
-            draw_users_table(users);
-            ImGui::End();
         }
 
         ImGui::Render();
@@ -274,18 +356,22 @@ int main(int argc, char **argv)
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xff); // sets the background color
         SDL_RenderClear(renderer);
 
-        curr_map->draw_background();
 
-        SDL_SetRenderDrawColor(renderer, the_line_color.r, the_line_color.g, the_line_color.b, 0xff);
-        SDL_RenderDrawLine(renderer,
-                           SCREEN_W >> 1, SCREEN_H >> 1,
-                           last_mouse_pos.first, last_mouse_pos.second);
+        if(curr_game_status == GameStatus::PLAYING) {
+            curr_map->draw_background();
 
-        pdd diff = last_mouse_pos - center;
-        const double phase = vector_phase(diff) + (PI / 2.0);
-        SDL_RenderCopyEx(renderer, gun_texture, NULL, &gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);//rotate and show wepon
+            SDL_SetRenderDrawColor(renderer, the_line_color.r, the_line_color.g, the_line_color.b, 0xff);
+            SDL_RenderDrawLine(renderer,
+                            SCREEN_W >> 1, SCREEN_H >> 1,
+                            last_mouse_pos.first, last_mouse_pos.second);
 
-        render_balls(balls, map_location_step, map_location);
+            pdd diff = last_mouse_pos - center;
+            const double phase = vector_phase(diff) + (PI / 2.0);
+            SDL_RenderCopyEx(renderer, gun_texture, NULL, &gun_rect, phase * RAD_TO_DEG, NULL, SDL_FLIP_NONE);//rotate and show wepon
+            curr_game_status = render_balls(balls, map_location_step, map_location);
+        } else if(curr_game_status == GameStatus::NOT_STARTED) {
+            step_slideshow(renderer, dt);
+        }
 
         if(should_record_map) {
             new_map->draw_status(last_mouse_pos);

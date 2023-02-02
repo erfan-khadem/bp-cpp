@@ -34,6 +34,14 @@ typedef uint64_t u64;
 typedef std::pair<int, int> pii;
 typedef int64_t s64;
 
+enum GameStatus{
+    PLAYING,
+    PAUSED,
+    NOT_STARTED,
+    LOST,
+    WON,
+};
+
 #include "vec_utils.hpp"
 #include "phase.hpp"
 #include "geometry.hpp"

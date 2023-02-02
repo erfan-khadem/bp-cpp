@@ -1,7 +1,7 @@
 import sys
 import random
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 DIM_X = 1280
 DIM_Y = 800
@@ -18,10 +18,10 @@ RADS = [
 NUM_RANDS = 60
 
 FILLS = [
-    "#865e3c",
-    "#986a44",
-    "#b5835a",
-    "#63452c",
+    "#241f31aa",
+    "#3d3846aa",
+    "#5e5c64aa",
+    "#77767baa",
 ]
 
 def draw_circle(draw: ImageDraw, radius: int, center: tuple[int, int], fill: str | tuple) -> None:
@@ -68,8 +68,9 @@ def main() -> None:
         color = random.choice(FILLS[1:])
         draw_circle(draw, rad, (x, y), color)
 
+    image_final = image.filter(ImageFilter.GaussianBlur(2))
 
-    image.save(output_name)
+    image_final.save(output_name)
 
 
 if __name__ == "__main__":
