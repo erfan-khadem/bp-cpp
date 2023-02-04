@@ -44,7 +44,8 @@ void to_json(json &j, const User &u){
         {"register_time", u.register_time},
         {"max_score", u.max_score},
         {"max_score_time", u.max_score_time},
-        {"pw_hash", u.pw_hash}
+        {"pw_hash", u.pw_hash},
+        {"power_ups", u.power_ups}
     };
 }
 
@@ -54,6 +55,7 @@ void from_json(const json &j, User &u){
     j.at("max_score").get_to(u.max_score);
     j.at("max_score_time").get_to(u.max_score_time);
     j.at("pw_hash").get_to(u.pw_hash);
+    j.at("power_ups").get_to(u.power_ups);
 }
 
 bool verify_user(const User &u, const string &pw) {

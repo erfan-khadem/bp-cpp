@@ -7,6 +7,8 @@
 
 using json = nlohmann::json;
 
+typedef map<string, int> PowerUps;
+
 class User
 {
 private:
@@ -16,6 +18,8 @@ public:
     u64 max_score;
     time_t max_score_time;
     string pw_hash;
+
+    PowerUps power_ups;
 
     User();
     User(const string &name, const string &pw); // Registers the user

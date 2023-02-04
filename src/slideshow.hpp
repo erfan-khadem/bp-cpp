@@ -1,6 +1,7 @@
 #pragma once
 
 #include <regex>
+#include <algorithm>
 #include <filesystem>
 
 #include "utils/common.h"
@@ -34,6 +35,7 @@ vector<SDL_Texture*> get_slideshow_images(SDL_Renderer *rend) {
             SDL_SetTextureBlendMode(result.back(), SDL_BLENDMODE_BLEND);
         }
     }
+    shuffle(result.begin(), result.end(), rng);
     return result;
 }
 
@@ -61,4 +63,10 @@ void step_slideshow(SDL_Renderer *rend, const double dt) {
 void reset_slideshow() {
     SlideShow::curr_pos = 0;
     SlideShow::ptr = 0;
+}
+
+void cleanup_slideshow() {
+    for(auto txt:SlideShow::slides) {
+        SDL_DestroyTexture(txt);
+    }
 }
