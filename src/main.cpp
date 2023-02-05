@@ -33,9 +33,154 @@ using namespace std;
 #define BALL_TEXT_COUNT 5
 #define NUM_BALLS 40
 #define DEBUG true
+//#define DEBUG false
 
 static bool should_record_map = false;
+static int user_score = 0;
 MusicPlayer *music_player = nullptr;
+
+char buf[100];
+
+int selected_map = 0;
+int curr_game_status = GameStatus::NOT_STARTED;
+int idx_selected_power_up;
+
+double map_location = 0;  
+double map_location_step = 0;
+double game_speed_factor = 1.0;
+
+bool pause_cooldown = false;
+bool play_music = false;
+bool play_sfx = true;
+bool schedule_game_status = false;
+bool reverse_effect = false;
+bool pause_effect = false;
+bool slowdown_effect = false;
+
+string maps_combo_choices;
+string user_power_ups;
+string selected_power_up;
+
+s64 prev_time = 0;
+s64 curr_time = 0;
+s64 game_start_time = 0;
+
+SDL_Window *window;
+SDL_Renderer *renderer;
+SDL_Event event;
+SDL_Rect holder_rect = {.x=(SCREEN_W - HOLDER_DIM)/2, .y=(SCREEN_H - HOLDER_DIM)/2,
+                        .w=HOLDER_DIM, .h=HOLDER_DIM};
+
+SDL_Texture *holder_texture;
+SDL_Texture *frost_texture;
+
+vector<SDL_Texture*> ball_textures;
+vector<Map*> maps;
+
+list<Ball*> balls;
+list<ShootingBall*> shot_balls;
+
+NewMap *new_map = nullptr;
+Map *curr_map = nullptr;
+UserMap users = get_user_list();
+User* curr_user = nullptr;
+ShootingBall* center_ball = nullptr;
+
+pdd last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1}; // Do not change!
+const pdd center = last_mouse_pos;
+
+auto reset_game_status = [](){
+    if(schedule_game_status == false) {
+        Scheduler::schedule.emplace(
+            curr_time + 5'000,
+            [&](const s64 _) {
+                (void)_;
+                schedule_game_status = false;
+                curr_game_status = GameStatus::NOT_STARTED;
+            }
+        );
+        schedule_game_status = true;
+    }
+    game_speed_factor = 1.0;
+    balls.clear();
+    shot_balls.clear();
+    if(center_ball != nullptr) {
+        delete center_ball;
+        center_ball = nullptr;
+    }
+    user_score = 0;
+};
+auto enable_reverse_effect = []() {
+    if(reverse_effect) {
+        return;
+    }
+    reverse_effect = true;
+    pause_effect = false;
+    slowdown_effect = false;
+    music_player->play_sound("rewind.wav");
+    Scheduler::schedule.emplace(
+        curr_time + 5'000,
+        [&](const s64 _) {
+            (void)_;
+            reverse_effect = false;
+        }
+    );
+};
+auto enable_pause_effect = []() {
+    if(reverse_effect || pause_effect) {
+        return;
+    }
+    pause_effect = true;
+    slowdown_effect = false;
+    music_player->play_sound("pause.wav");
+    Scheduler::schedule.emplace(
+        curr_time + 5'000,
+        [&](const s64 _) {
+            (void)_;
+            pause_effect = false;
+        }
+    );
+};
+auto enable_slowdown_effect = []() {
+    if(slowdown_effect || pause_effect) {
+        return;
+    }
+    slowdown_effect = true;
+    music_player->play_sound("freeze.wav");
+    Scheduler::schedule.emplace(
+        curr_time + 5'000,
+        [&](const s64 _) {
+            (void)_;
+            slowdown_effect = false;
+        }
+    );
+};
+auto remake_user_power_ups = []() {
+    user_power_ups = "";
+    int curr_size = 0;
+    user_power_ups += "None\0";
+    for(const auto &[name, cnt]:curr_user->power_ups) {
+        if(cnt <= 0) {
+            continue;
+        }
+        curr_size = name.size();
+        user_power_ups += name;
+        assert(curr_size < 32);
+        while(curr_size < 32) {
+            user_power_ups.push_back(' ');
+        }
+        user_power_ups += to_string(cnt);
+        user_power_ups += '\0';
+    }
+    user_power_ups += '\0';
+};
+auto remake_center_ball = [](){
+    if(center_ball == nullptr) {
+        UID(cball_color, 0, ball_textures.size() - 1);
+        int col = cball_color(rng);
+        center_ball = new ShootingBall(col, ball_textures[col], renderer, NULL);
+    }
+};
 
 void parse_arguments(const int argc, char **argv) {
     int opt;
@@ -51,13 +196,60 @@ void parse_arguments(const int argc, char **argv) {
     }
 }
 
+bool clear_balls(list<Ball*> &balls, list<Ball*>::iterator &it) {
+    auto mn_ptr = it;
+    auto mx_ptr = it;
+    auto pptr = it;
+    int cnt = 2;
+    while(mn_ptr != balls.begin()) {
+        pptr = mn_ptr;
+        mn_ptr--;
+        if(!(*mn_ptr)->same_color(*(*pptr))) {
+            mn_ptr++;
+            break;
+        }
+        cnt++;
+    }
+
+    while(mx_ptr != balls.end()) {
+        pptr = mx_ptr;
+        mx_ptr++;
+        if(mx_ptr == balls.end() || !(*mx_ptr)->same_color(*(*pptr))){
+            mx_ptr--;
+            break;
+        }
+        cnt++;
+    }
+    if(cnt >= 3) {
+        assert((*mn_ptr)->same_color(**mx_ptr));
+        assert(it != mx_ptr || it != mn_ptr);
+        mx_ptr++;
+        it = mx_ptr;
+        for(auto pt = mn_ptr; pt != mx_ptr;) {
+            if((*pt)->freeze) {
+                enable_slowdown_effect();
+            } else if((*pt)->pause) {
+                enable_pause_effect();
+            } else if((*pt)->reverse) {
+                enable_reverse_effect();
+            }
+            pt = balls.erase(pt);
+        }
+        assert(it == mx_ptr);
+        user_score += 10 * cnt;
+        return true;
+    }
+    return false;
+}
+
 int render_balls(list<Ball*> &balls, list<ShootingBall*> &shot_balls,
     int gs, const double dt, double &step, double &map_location) {
     if(balls.empty()) {
         return GameStatus::WON;
     }
-    if(gs == GameStatus::PLAYING){
-        step = GLOBAL_SPEED_FACTOR * dt * 100;
+    if(gs == GameStatus::PLAYING && !pause_effect){
+        step = GLOBAL_SPEED_FACTOR * dt * 100 * (slowdown_effect ? 0.5 : 1.0);
+        step = reverse_effect ? -step:step;
         map_location += step ;
     } else {
         step = 0;
@@ -86,7 +278,7 @@ int render_balls(list<Ball*> &balls, list<ShootingBall*> &shot_balls,
         if((*ptr)->should_render){
             double new_pos = (*ptr)->loc_index + step;
             (*ptr)->move_to_location(new_pos);
-            if((*ptr)->should_render == false) {
+            if((*ptr)->should_render == false && (*ptr)->loc_index > 100) {
                 return GameStatus::LOST;
             }
         } else {
@@ -101,10 +293,26 @@ int render_balls(list<Ball*> &balls, list<ShootingBall*> &shot_balls,
         sptr = shot_balls.begin();
         while(sptr != shot_balls.end()) {
             if((*ptr)->collides(**sptr)) {
-                balls.insert(++ptr, &(*sptr)->to_normal_ball((*ptr)->locations));
-                --ptr;
-                sptr = shot_balls.erase(sptr);
                 recalculate = true;
+                if((*ptr)->same_color(**sptr) && clear_balls(balls, ptr)) {
+                    sptr = shot_balls.erase(sptr);
+                    ptr--;
+                } else if(++ptr != balls.end() && (*ptr)->same_color(**sptr) && clear_balls(balls, ptr)){
+                    sptr = shot_balls.erase(sptr);
+                    ptr--;
+                    ptr--;
+                } else {
+                    auto bptr = ptr;
+                    ptr--;
+                    if((*sptr)->ball_color == MULTI_COLOR){
+                        balls.insert(++ptr, &(*sptr)->to_normal_ball((*bptr)->locations,
+                            (*bptr)->ball_color, (*bptr)->ball_txt));
+                    } else {
+                        balls.insert(++ptr, &(*sptr)->to_normal_ball((*bptr)->locations));
+                    }
+                    sptr = shot_balls.erase(sptr);
+                    ptr--;
+                }
             } else {
                 sptr++;
             }
@@ -116,12 +324,16 @@ int render_balls(list<Ball*> &balls, list<ShootingBall*> &shot_balls,
     if(recalculate){
         music_player->play_sound("collision.wav");
         ptr = balls.begin();
+        map_location = (*ptr)->loc_index;
         for(int i = 1; i < int(balls.size()); i++) {
             const double pos = (*ptr)->get_previous_ball_pos();
             (*(++ptr))->move_to_location(pos);
         }
     }
     for(auto b:balls) {
+        if(b->loc_index > 100 && b->should_render == false) {
+            return GameStatus::LOST;
+        }
         b->draw_ball();
     }
     return GameStatus::PLAYING;
@@ -130,123 +342,6 @@ int render_balls(list<Ball*> &balls, list<ShootingBall*> &shot_balls,
 int main(int argc, char **argv)
 {
     parse_arguments(argc, argv);
-
-    char buf[100];
-
-    int selected_map = 0;
-    int curr_game_status = GameStatus::NOT_STARTED;
-    int idx_selected_power_up;
-
-    double map_location = 0;  
-    double map_location_step = 0;
-    double game_speed_factor = 1.0;
-
-    bool pause_cooldown = false;
-    bool play_music = true;
-    bool play_sfx = true;
-    bool schedule_game_status = false;
-    bool pause_effect = false;
-    bool slowdown_effect = false;
-
-    string maps_combo_choices;
-    string user_power_ups;
-    string selected_power_up;
-
-    s64 prev_time = 0;
-    s64 curr_time = 0;
-
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    SDL_Event event;
-    SDL_Rect holder_rect = {.x=(SCREEN_W - HOLDER_DIM)/2, .y=(SCREEN_H - HOLDER_DIM)/2,
-                            .w=HOLDER_DIM, .h=HOLDER_DIM};
-
-    SDL_Texture *holder_texture;
-
-    vector<SDL_Texture*> ball_textures;
-    vector<Map*> maps;
-
-    list<Ball*> balls;
-    list<ShootingBall*> shot_balls;
-
-    NewMap *new_map = nullptr;
-    Map *curr_map = nullptr;
-    UserMap users = get_user_list();
-    User* curr_user = nullptr;
-    ShootingBall* center_ball = nullptr;
-
-    // TODO: Delete me!
-    pdd last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1}; // Do not change!
-
-    auto reset_game_status = [&](){
-        if(schedule_game_status == false) {
-            Scheduler::schedule.emplace(
-                curr_time + 5'000,
-                [&](const s64 _) {
-                    (void)_;
-                    schedule_game_status = false;
-                    curr_game_status = GameStatus::NOT_STARTED;
-                }
-            );
-            schedule_game_status = true;
-        }
-        game_speed_factor = 1.0;
-    };
-    auto enable_pause_effect __attribute__((unused)) = [&]() {
-        if(pause_effect) {
-            return;
-        }
-        pause_effect = true;
-        slowdown_effect = false;
-        Scheduler::schedule.emplace(
-            curr_time + 5'000,
-            [&](const s64 _) {
-                (void)_;
-                pause_effect = false;
-            }
-        );
-    };
-    auto enable_slowdown_effect __attribute__((unused)) = [&]() {
-        if(slowdown_effect || pause_effect) {
-            return;
-        }
-        slowdown_effect = true;
-        Scheduler::schedule.emplace(
-            curr_time + 5'000,
-            [&](const s64 _) {
-                (void)_;
-                slowdown_effect = false;
-            }
-        );
-    };
-    auto remake_user_power_ups = [&]() {
-        user_power_ups = "";
-        int curr_size = 0;
-        user_power_ups += "None\0";
-        for(const auto &[name, cnt]:curr_user->power_ups) {
-            if(cnt <= 0) {
-                continue;
-            }
-            curr_size = name.size();
-            user_power_ups += name;
-            assert(curr_size < 32);
-            while(curr_size < 32) {
-                user_power_ups.push_back(' ');
-            }
-            user_power_ups += to_string(cnt);
-            user_power_ups += '\0';
-        }
-        user_power_ups += '\0';
-    };
-    auto remake_center_ball = [&](){
-        if(center_ball == nullptr) {
-            UID(cball_color, 0, ball_textures.size() - 1);
-            int col = cball_color(rng);
-            center_ball = new ShootingBall(col, ball_textures[col], renderer, NULL);
-        }
-    };
-
-    const pdd center = last_mouse_pos;
 
     // --- Starting Initialization!
     if (sodium_init() < 0) {
@@ -313,16 +408,23 @@ int main(int argc, char **argv)
         maps_combo_choices += '\0';
     }
 
-    //TODO: Do this properly!
     curr_map = maps.at(selected_map);
 
     for(int i = 1; i <= BALL_TEXT_COUNT; i++) {
         snprintf(buf, 90, "../art/images/ball%02d.png", i);
         ball_textures.push_back(IMG_LoadTexture(renderer, buf));
         assert(ball_textures.back() != nullptr);
+        SDL_SetTextureBlendMode(ball_textures.back(), SDL_BLENDMODE_NONE);
     }
 
     holder_texture = IMG_LoadTexture(renderer, "../art/images/holder.png");
+    frost_texture = IMG_LoadTexture(renderer, "../art/images/frost-effect.png");
+    freeze_txt = IMG_LoadTexture(renderer, "../art/images/freeze.png");
+    pause_txt = IMG_LoadTexture(renderer, "../art/images/pause.png");
+    reverse_txt = IMG_LoadTexture(renderer, "../art/images/reverse.png");
+    colordots_txt = IMG_LoadTexture(renderer, "../art/images/color-dots.png");
+    greyball_txt = IMG_LoadTexture(renderer, "../art/images/ball06.png");
+
     assert(holder_texture != nullptr);
     SlideShow::slides = get_slideshow_images(renderer);
     // Now let's setup ImGUI:
@@ -476,7 +578,7 @@ int main(int argc, char **argv)
                         }
                     }
                     ImGui::SetCursorPosX(ImGui::GetContentRegionAvail().x / 2 - 100);
-                    if(ImGui::Button("Start!", ImVec2(100, 30))) {
+                    if(ImGui::Button("Start", ImVec2(100, 30))) {
                         if(selected_power_up != "None"){
                             curr_user->power_ups[selected_power_up]--;
                         }
@@ -489,6 +591,7 @@ int main(int argc, char **argv)
                             }
                         }
                         map_location = 0;
+                        game_start_time = curr_time;
                         curr_game_status = GameStatus::PLAYING;
                     }
                     ImGui::SameLine();
@@ -542,6 +645,9 @@ int main(int argc, char **argv)
                 curr_game_status = r;
             }
             assert(center_ball != nullptr);
+            if(slowdown_effect) {
+                SDL_RenderCopy(renderer, frost_texture, NULL, NULL);
+            }
             center_ball->draw_ball();
         } else if(curr_game_status == GameStatus::NOT_STARTED) {
             step_slideshow(renderer, dt);

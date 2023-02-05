@@ -44,7 +44,7 @@ MusicPlayer::MusicPlayer(){
             in_game_music.push_back(name);
         }
     }
-    sort(in_game_music.begin(), in_game_music.end());
+    shuffle(in_game_music.begin(), in_game_music.end(), rng);
     assert(in_game_music.size() > 0);
     Mix_HookMusicFinished(&music_stopped);
 }

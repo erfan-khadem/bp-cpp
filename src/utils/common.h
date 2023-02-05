@@ -44,6 +44,13 @@ enum GameStatus{
     WON = 0b1100,
 };
 
+#define PUP_BOMB "Bomb"
+#define PUP_FIRE "Fire"
+
+const vector<string> POWER_UPS = {
+    PUP_BOMB, PUP_FIRE
+};
+
 #include "vec_utils.hpp"
 #include "phase.hpp"
 #include "geometry.hpp"

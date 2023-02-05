@@ -44,12 +44,12 @@ User* login_or_register(UserMap &umap) {
     }
 
     float button_width = 0;
-    button_width += ImGui::CalcTextSize("Login").x;
-    button_width += should_register ? ImGui::CalcTextSize("Register User").x : 0.0;
+    button_width += 100;
+    button_width += should_register ? 200 : 0;
 
     AlignForWidth(button_width);
 
-    if(ImGui::Button("Login")) {
+    if(ImGui::Button("Login", ImVec2(100, 30))) {
         auto usr = umap.find(username);
         if(usr == umap.end()) {
             goto show_registration;
@@ -68,7 +68,7 @@ show_registration:
         if(!passwords_match){
             ImGui::BeginDisabled();
         }
-        if(ImGui::Button("Register User")) {
+        if(ImGui::Button("Register User", ImVec2(200, 30))) {
             User* user = nullptr;
             if(umap.find(username) != umap.end()) {
                 goto end_draw;
