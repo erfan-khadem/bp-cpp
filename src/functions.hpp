@@ -4,38 +4,6 @@
 #include "SDL_image.h"
 
 #include "utils/common.h"
-
-void reset_game_status() {
-  if (schedule_game_status == false) {
-    Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
-      (void)_;
-      schedule_game_status = false;
-      curr_game_status = GameStatus::NOT_STARTED;
-      game_speed_factor = 1.0;
-      user_score = 0;
-      good_luck = false;
-    });
-    for(auto &b: balls){
-      delete b;
-    }
-    for(auto &b: shot_balls) {
-      delete b;
-    }
-    balls.clear();
-    shot_balls.clear();
-    if (center_ball != nullptr) {
-      delete center_ball;
-      center_ball = nullptr;
-    }
-    if (curr_user != nullptr) {
-      if(curr_user->max_score < user_score) {
-        curr_user->max_score_time = get_utc_secs();
-        curr_user->max_score = user_score;
-      }
-    }
-    schedule_game_status = true;
-  }
-}
 void enable_reverse_effect() {
   if (reverse_effect) {
     return;
@@ -77,22 +45,22 @@ void enable_slowdown_effect() {
 
 void remake_user_power_ups() {
   user_power_ups = "";
-  int curr_size = 0;
-  user_power_ups += "None\0";
+  user_power_ups += "None";
+  user_power_ups += '\0';
   for (const auto &[name, cnt] : curr_user->power_ups) {
     if (cnt <= 0) {
       continue;
     }
-    curr_size = name.size();
+    int curr_size = name.size();
     user_power_ups += name;
-    assert(curr_size < 32);
-    while (curr_size < 32) {
+    assert(curr_size < 16);
+    while (curr_size < 16) {
       user_power_ups.push_back(' ');
+      curr_size++;
     }
     user_power_ups += to_string(cnt);
-    user_power_ups += '\0';
+    user_power_ups += "\0";
   }
-  user_power_ups += '\0';
 }
 
 void remake_center_ball() {
@@ -105,7 +73,43 @@ void remake_center_ball() {
     }
     center_ball = new ShootingBall(col, ball_textures[col], renderer, NULL);
   }
-};
+}
+
+void reset_game_status() {
+  if (schedule_game_status == false) {
+    Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
+      (void)_;
+      schedule_game_status = false;
+      curr_game_status = GameStatus::NOT_STARTED;
+      game_speed_factor = 1.0;
+      user_score = 0;
+      good_luck = false;
+    });
+    for (auto &b : balls) {
+      delete b;
+    }
+    for (auto &b : shot_balls) {
+      delete b;
+    }
+    balls.clear();
+    shot_balls.clear();
+    if (center_ball != nullptr) {
+      delete center_ball;
+      center_ball = nullptr;
+    }
+    if (curr_user != nullptr) {
+      if (curr_user->max_score < user_score) {
+        curr_user->max_score_time = get_utc_secs();
+        curr_user->max_score = user_score;
+      }
+      if (user_score >= 1000)
+        curr_user->power_ups[PUP_LUCK]++;
+
+      remake_user_power_ups();
+    }
+  }
+  schedule_game_status = true;
+}
 
 void generate_game_balls(const int cnt_balls) {
   UID(color_gen, 0, ball_textures.size() - 1);
@@ -128,8 +132,6 @@ void show_login_screen() {
   if (curr_user != nullptr) {
     curr_user->load_settings();
     remake_user_power_ups();
-    idx_selected_power_up = 0;
-    selected_power_up = "";
   }
 }
 
@@ -167,6 +169,7 @@ void show_main_menu() {
         while (ptr->second == 0) {
           ptr++;
         }
+        cidx++;
       }
       selected_power_up = ptr->first;
       curr_user->power_ups[selected_power_up]--;
@@ -183,6 +186,9 @@ void show_main_menu() {
     game_start_time = curr_time;
     curr_game_status = GameStatus::PLAYING;
     prev_ball_dist = curr_map->prev_ball_dist;
+  }
+  if (selected_power_up == PUP_LUCK) {
+    good_luck = true;
   }
   ImGui::SameLine();
   if (ImGui::Button("Logout", ImVec2(100, 30))) {
@@ -345,29 +351,29 @@ int render_balls(list<Ball *> &balls, list<ShootingBall *> &shot_balls, int gs,
     sptr = shot_balls.begin();
     while (sptr != shot_balls.end()) {
       if ((*ptr)->collides(**sptr)) {
-        if((*sptr)->is_fire) {
+        if ((*sptr)->is_fire) {
           music_player->play_sound("fire.wav");
           (*sptr)->is_fire = false;
           (*sptr)->create_texture();
           auto tmp = balls.begin();
-          while(tmp != balls.end()) {
-            if((*tmp)->should_render == false && (*tmp)->loc_index < 10) {
+          while (tmp != balls.end()) {
+            if ((*tmp)->should_render == false && (*tmp)->loc_index < 10) {
               break;
             }
             (*tmp)->unfreeze();
             tmp++;
           }
-        } else if((*sptr)->is_bomb) {
+        } else if ((*sptr)->is_bomb) {
           music_player->play_sound("bomb.wav");
           auto fptr = ptr;
-          for(int i = 0; i < 3 && fptr != balls.begin(); i++) {
+          for (int i = 0; i < 3 && fptr != balls.begin(); i++) {
             fptr--;
             (*fptr)->ball_color = 0;
             (*fptr)->frozen = false;
             (*fptr)->uncolored = false;
           }
           fptr = ptr;
-          for(int i = 0; i < 3 && fptr != balls.end(); i++, fptr++) {
+          for (int i = 0; i < 3 && fptr != balls.end(); i++, fptr++) {
             (*fptr)->ball_color = 0;
             (*fptr)->frozen = false;
             (*fptr)->uncolored = false;
@@ -414,19 +420,19 @@ int render_balls(list<Ball *> &balls, list<ShootingBall *> &shot_balls, int gs,
     for (int i = 1; i < int(balls.size()); i++) {
       const double pos = (*ptr)->get_previous_ball_pos();
       (*(++ptr))->move_to_location(pos);
-      if((*ptr)->should_render == false && (*ptr)->loc_index < 10) {
+      if ((*ptr)->should_render == false && (*ptr)->loc_index < 10) {
         break;
       }
     }
   }
   in_game_ball_colors.clear();
   ptr = balls.begin();
-  while(ptr != balls.end()){
+  while (ptr != balls.end()) {
     auto b = *ptr;
     if (b->loc_index > 100 && b->should_render == false &&
         game_mode == GameMode::FinishUp) {
       return GameStatus::LOST;
-    } else if(b->loc_index > 100 && b->should_render == false) {
+    } else if (b->loc_index > 100 && b->should_render == false) {
       delete b;
       ptr = balls.erase(ptr);
       continue;

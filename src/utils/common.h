@@ -52,10 +52,9 @@ enum GameStatus {
 
 enum GameMode { FinishUp, Timed };
 
-#define PUP_BOMB "Bomb"
-#define PUP_FIRE "Fire"
+#define PUP_LUCK "Good Luck"
 
-const vector<string> POWER_UPS = {PUP_BOMB, PUP_FIRE};
+const vector<string> POWER_UPS = {PUP_LUCK};
 
 #include "geometry.hpp"
 #include "phase.hpp"

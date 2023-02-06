@@ -120,6 +120,11 @@ void user_won(u64 user_score, vector<Map *> &maps, Map *curr_map) {
   width = ImGui::CalcTextSize(buf).x;
   AlignForWidth(width);
   ImGui::TextColored(ImVec4(0.96, 0.76, 0.07, 1.0), buf);
+  if(user_score >= 1000) {
+    width = ImGui::CalcTextSize("New Power UP: GoodLuck").x;
+    AlignForWidth(width);
+    ImGui::TextColored(ImVec4(0.96, 0.76, 0.07, 1.0), "New Power UP: GoodLuck");
+  }
   width = ImGui::CalcTextSize("Try Other maps:").x;
   AlignForWidth(width);
   ImGui::Text("Try Other maps:");

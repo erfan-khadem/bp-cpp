@@ -1,6 +1,6 @@
 [
     {
-        "game_mode": 1,
+        "game_mode": 0,
         "idx_pup": 0,
         "max_score": 1620,
         "max_score_time": 1675202033,
@@ -8,10 +8,10 @@
         "play_music": false,
         "play_sfx": true,
         "power_ups": {
-            "": -69
+            "Good Luck": 0
         },
         "pw_hash": "$argon2id$v=19$m=1048576,t=4,p=1$CTfbtEMPAasc03ePIPfgPA$nvmXovajYTpxqHOiaTAFfb5mxaEFvjh0wpBdXz0M72M\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
         "register_time": 1675202033,
-        "selected_map": 0
+        "selected_map": 4
     }
 ]
