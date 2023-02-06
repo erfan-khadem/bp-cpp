@@ -15,19 +15,21 @@ using std::map;
 #define BALL_PNG_SIZE 1280
 // This is the size of the circle drawn on the screen
 #define REAL_BALL_SIZE 50
-#define GLOBAL_SPEED_FACTOR 1.0
+#define GLOBAL_SPEED_FACTOR 0.6
 #define SHOOTING_BALL_SPEED_COEFF (3000.0 * GLOBAL_SPEED_FACTOR)
 
 #define MULTI_COLOR (1 << 16)
-#define FIRE_COLOR (1 << 17)
+#define UNCOLORED (1 << 18)
+#define FROZEN_COLOR (1 << 19)
 #define COLOR_MSK 0xffff
 
 static const double sq_2x_radius = BALL_SIZE * BALL_SIZE;
 
-typedef const vector<pii> *PointerType;
+double prev_ball_dist = 0.0;
 
-map<PointerType, s64> address_users;
-map<PointerType, vector<int>> calc_prev;
+bool good_luck = false;
+
+typedef const vector<pii> *PointerType;
 
 vector<SDL_Texture *> ball_textures;
 
@@ -38,6 +40,8 @@ SDL_Texture *reverse_txt = nullptr;
 SDL_Texture *colordots_txt = nullptr;
 SDL_Texture *bomb_txt = nullptr;
 SDL_Texture *fire_txt = nullptr;
+SDL_Texture *uncolored_txt = nullptr;
+SDL_Texture *frozenball_txt = nullptr;
 
 class Ball {
 public:
@@ -47,6 +51,10 @@ public:
   bool freeze = false;
   bool pause = false;
   bool reverse = false;
+  bool uncolored = false;
+  bool frozen = false;
+  bool is_bomb = false;
+  bool is_fire = false;
 
   SDL_Rect position;
   SDL_Rect draw_position;
@@ -82,10 +90,6 @@ public:
       assert(locations->size());
       position.x = locations->at(0).first;
       position.y = locations->at(0).second;
-      if (address_users.find(locations) == address_users.end()) {
-        address_users[locations] = 0;
-      }
-      address_users[locations]++;
     }
     // Should not be a center ball
     URD(special_power, 0, 1);
@@ -100,42 +104,73 @@ public:
           freeze = true;
         }
       }
+      if(special_power(rng) < 0.1) {
+        if(special_power(rng) < 0.5) {
+          uncolored = true;
+          ball_color = UNCOLORED;
+          ball_txt = greyball_txt;
+        } else {
+          frozen = true;
+          ball_color |= FROZEN_COLOR;
+        }
+      }
     } else {
       // Any color effect is for center ball only
-      if (special_power(rng) < 0.1) {
-        ball_color = MULTI_COLOR;
-        ball_txt = greyball_txt;
+      if (special_power(rng) < (good_luck ? 0.3 : 0.1)) {
+        double val = special_power(rng);
+        if(val < 0.5) {
+          ball_color = MULTI_COLOR;
+          ball_txt = greyball_txt;
+        } else if(val < 0.75) {
+          is_fire = true;
+        } else {
+          is_bomb = true;
+        }
       }
     }
-    render_txt = SDL_CreateTexture(rend, SDL_PIXELFORMAT_RGBA8888,
-                                   SDL_TEXTUREACCESS_TARGET, 1280, 1280);
-    assert(render_txt != nullptr);
-    assert(SDL_SetRenderTarget(rend, render_txt) == 0);
-    SDL_SetRenderDrawColor(rend, 0, 0, 0, 0);
-    SDL_RenderClear(rend);
-    SDL_RenderCopy(rend, ball_txt, NULL, NULL);
-    auto rect = SDL_Rect{.x = 384, .y = 384, .w = 512, .h = 512};
-    if (ball_color & MULTI_COLOR) {
-      auto rect2 = SDL_Rect{.x = 384, .y = 417, .w = 512, .h = 445};
-      SDL_RenderCopy(rend, colordots_txt, NULL, &rect2);
-    }
-    if (pause) {
-      SDL_RenderCopy(rend, pause_txt, NULL, &rect);
-    } else if (freeze) {
-      SDL_RenderCopy(rend, freeze_txt, NULL, &rect);
-    } else if (reverse) {
-      SDL_RenderCopy(rend, reverse_txt, NULL, &rect);
-    }
-    SDL_SetRenderTarget(rend, NULL);
-    SDL_SetTextureBlendMode(render_txt, SDL_BLENDMODE_BLEND);
+    render_txt = nullptr;
+    create_texture();
   }
 
   ~Ball() {
     // DO NOT destroy ball_texture!
-    if (locations != nullptr && (--address_users[locations]) == 0) {
-      calc_prev.erase(calc_prev.find(locations));
-    }
     SDL_DestroyTexture(render_txt);
+  }
+
+  void create_texture() {
+    if(render_txt == nullptr){
+      render_txt = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
+                                    SDL_TEXTUREACCESS_TARGET, 1280, 1280);
+    }
+    assert(render_txt != nullptr);
+    assert(SDL_SetRenderTarget(renderer, render_txt) == 0);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, ball_txt, NULL, NULL);
+    auto rect = SDL_Rect{.x = 384, .y = 384, .w = 512, .h = 512};
+    if (ball_color & MULTI_COLOR) {
+      auto rect2 = SDL_Rect{.x = 384, .y = 417, .w = 512, .h = 445};
+      SDL_RenderCopy(renderer, colordots_txt, NULL, &rect2);
+    } else if(is_bomb) {
+      SDL_RenderCopy(renderer, bomb_txt, NULL, &rect);
+    } else if(is_fire) {
+      SDL_RenderCopy(renderer, fire_txt, NULL, &rect);
+    }
+    if (pause) {
+      SDL_RenderCopy(renderer, pause_txt, NULL, &rect);
+    } else if (freeze) {
+      SDL_RenderCopy(renderer, freeze_txt, NULL, &rect);
+    } else if (reverse) {
+      SDL_RenderCopy(renderer, reverse_txt, NULL, &rect);
+    }
+    if (frozen) {
+      SDL_RenderCopy(renderer, frozenball_txt, NULL, &rect);
+    } else if (uncolored) {
+      SDL_RenderCopy(renderer, uncolored_txt, NULL, &rect);
+    }
+    SDL_SetRenderTarget(renderer, NULL);
+    SDL_SetTextureBlendMode(render_txt, SDL_BLENDMODE_BLEND);
+
   }
 
   pii get_center() const {
@@ -143,27 +178,7 @@ public:
   }
 
   double get_previous_ball_pos() {
-    const int cpos = loc_index;
-    if (!should_render) {
-      return -1;
-    }
-    auto &vec = calc_prev[locations];
-    if (int(vec.size()) > cpos && vec[cpos] != -2) {
-      return vec[cpos] + loc_index - floor(loc_index);
-    }
-    if (cpos >= (int)vec.size())
-      vec.resize(cpos + 1, -2);
-
-    const auto pos = pii{position.x, position.y};
-
-    for (int i = cpos - 1; i >= 0; i--) {
-      if (square_euclid_dist(locations->at(i), pos) >= sq_2x_radius) {
-        vec[cpos] = cpos > 0 ? std::max(i, vec[cpos - 1]) : i;
-        return vec[cpos] + loc_index - floor(loc_index);
-      }
-    }
-    vec[cpos] = -1;
-    return -1;
+    return loc_index - prev_ball_dist;
   }
 
   void move_to_location(const double pos) {
@@ -198,7 +213,36 @@ public:
     return false;
   }
 
-  bool same_color(const Ball &other) const {
+  bool unfreeze() {
+    if(ball_color & FROZEN_COLOR) {
+      ball_color ^= FROZEN_COLOR;
+      frozen = false;
+      create_texture();
+      return true;
+    }
+    return false;
+  }
+
+  bool recolor(const Ball &other) {
+    if(ball_color & UNCOLORED) {
+      assert(other.uncolored == false);
+      ball_color ^= UNCOLORED;
+      ball_color = other.ball_color & COLOR_MSK;
+      ball_txt = other.ball_txt;
+      uncolored = false;
+      create_texture();
+      return true;
+    }
+    return false;
+  }
+
+  bool same_color(Ball &other) {
+    if(other.unfreeze() | this->unfreeze()) {
+      return false;
+    }
+    if(recolor(other) | other.recolor(*this)) {
+      return false;
+    }
     bool result = false;
     result |= (other.ball_color | ball_color) & MULTI_COLOR;
     result |= (other.ball_color & COLOR_MSK) == (ball_color & COLOR_MSK);
@@ -251,10 +295,6 @@ public:
     SDL_RenderClear(renderer);
     SDL_RenderCopy(renderer, col_txt, NULL, NULL);
     SDL_SetRenderTarget(renderer, NULL);
-    if (address_users.find(locations) == address_users.end()) {
-      address_users[locations] = 0;
-    }
-    address_users[locations]++;
     return *this;
   }
   Ball &to_normal_ball(const vector<pii> *const _locs) {
@@ -262,10 +302,6 @@ public:
     assert(locations == nullptr);
     assert(_locs != nullptr);
     locations = _locs;
-    if (address_users.find(locations) == address_users.end()) {
-      address_users[locations] = 0;
-    }
-    address_users[locations]++;
     return *this;
   }
 };

@@ -39,7 +39,6 @@ int game_mode = GameMode::FinishUp;
 int idx_selected_power_up;
 int target_num_balls = 0;
 
-double map_location = 0;
 double map_location_step = 0;
 double game_speed_factor = 1.0;
 
@@ -85,94 +84,6 @@ ShootingBall *center_ball = nullptr;
 
 pdd last_mouse_pos = {SCREEN_W >> 1, SCREEN_H >> 1}; // Do not change!
 const pdd center = last_mouse_pos;
-
-auto reset_game_status = []() {
-  if (schedule_game_status == false) {
-    Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
-      (void)_;
-      schedule_game_status = false;
-      curr_game_status = GameStatus::NOT_STARTED;
-    });
-    schedule_game_status = true;
-  }
-  game_speed_factor = 1.0;
-  balls.clear();
-  shot_balls.clear();
-  if (center_ball != nullptr) {
-    delete center_ball;
-    center_ball = nullptr;
-  }
-  if (curr_user != nullptr) {
-    curr_user->max_score = max(curr_user->max_score, user_score);
-  }
-  user_score = 0;
-};
-auto enable_reverse_effect = []() {
-  if (reverse_effect) {
-    return;
-  }
-  reverse_effect = true;
-  pause_effect = false;
-  slowdown_effect = false;
-  music_player->play_sound("rewind.wav");
-  Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
-    (void)_;
-    reverse_effect = false;
-  });
-};
-auto enable_pause_effect = []() {
-  if (reverse_effect || pause_effect) {
-    return;
-  }
-  pause_effect = true;
-  slowdown_effect = false;
-  music_player->play_sound("pause.wav");
-  Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
-    (void)_;
-    pause_effect = false;
-  });
-};
-auto enable_slowdown_effect = []() {
-  if (slowdown_effect || pause_effect || reverse_effect) {
-    return;
-  }
-  slowdown_effect = true;
-  music_player->play_sound("freeze.wav");
-  Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
-    (void)_;
-    slowdown_effect = false;
-  });
-};
-auto remake_user_power_ups = []() {
-  user_power_ups = "";
-  int curr_size = 0;
-  user_power_ups += "None\0";
-  for (const auto &[name, cnt] : curr_user->power_ups) {
-    if (cnt <= 0) {
-      continue;
-    }
-    curr_size = name.size();
-    user_power_ups += name;
-    assert(curr_size < 32);
-    while (curr_size < 32) {
-      user_power_ups.push_back(' ');
-    }
-    user_power_ups += to_string(cnt);
-    user_power_ups += '\0';
-  }
-  user_power_ups += '\0';
-};
-auto remake_center_ball = []() {
-  if (center_ball == nullptr) {
-    UID(cball_color, 0, ball_textures.size() - 1);
-    int col = cball_color(rng);
-    while (in_game_ball_colors.size() &&
-           in_game_ball_colors.find(col) == in_game_ball_colors.end()) {
-      col = cball_color(rng);
-    }
-    center_ball = new ShootingBall(col, ball_textures[col], renderer, NULL);
-  }
-};
 
 #include "functions.hpp"
 
@@ -370,7 +281,7 @@ int main(int argc, char **argv) {
           user_lost();
           reset_game_status();
         } else if (curr_game_status == GameStatus::WON) {
-          user_won();
+          user_won(user_score, maps, curr_map);
           reset_game_status();
         } else if (curr_game_status == GameStatus::PLAYING) {
           ImGui::Begin("Pause Game", NULL,
@@ -415,9 +326,9 @@ int main(int argc, char **argv) {
       const double phase = vector_phase(diff);
       SDL_RenderCopyEx(renderer, holder_texture, NULL, &holder_rect,
                        phase * RAD_TO_DEG, NULL,
-                       SDL_FLIP_NONE); // rotate and show wepon
+                       SDL_FLIP_NONE); // rotate and show weapon
       auto r = render_balls(balls, shot_balls, curr_game_status, dt,
-                            map_location_step, map_location);
+                            map_location_step);
       if (!(r & GameStatus::IN_GAME)) {
         curr_game_status = r;
       }

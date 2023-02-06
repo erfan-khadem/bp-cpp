@@ -28,11 +28,12 @@ def main() -> None:
     ln = len(arr[0])
     fx = interpolate.interp1d(indx, arr[0], kind='cubic')
     fy = interpolate.interp1d(indx, arr[1], kind='cubic')
-    cnt = int(total_length * 1.3)
+    cnt = int(total_length * 1.4)
     indx_res = np.linspace(0, ln, cnt * 100)
     xn = fx(indx_res)
     yn = fy(indx_res)
 
+    ball_diameter = 64  # Pixels
     reference_dist = math.dist((xn[0], yn[0]), (xn[99], yn[99]))
     res = [(xn[0], yn[0])]
     for x, y in zip(xn, yn):
@@ -41,7 +42,7 @@ def main() -> None:
             res.append((x, y))
 
     with open(result_locations, "w") as nf:
-        nf.write("1\n")
+        nf.write(f"{ball_diameter / reference_dist}\n")
         nf.write(f"{len(res)}\n")
         for x, y in res:
             nf.write(f"{round(x)} {round(y)}\n")

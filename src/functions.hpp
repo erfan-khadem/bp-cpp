@@ -5,6 +5,108 @@
 
 #include "utils/common.h"
 
+void reset_game_status() {
+  if (schedule_game_status == false) {
+    Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
+      (void)_;
+      schedule_game_status = false;
+      curr_game_status = GameStatus::NOT_STARTED;
+      game_speed_factor = 1.0;
+      user_score = 0;
+      good_luck = false;
+    });
+    for(auto &b: balls){
+      delete b;
+    }
+    for(auto &b: shot_balls) {
+      delete b;
+    }
+    balls.clear();
+    shot_balls.clear();
+    if (center_ball != nullptr) {
+      delete center_ball;
+      center_ball = nullptr;
+    }
+    if (curr_user != nullptr) {
+      if(curr_user->max_score < user_score) {
+        curr_user->max_score_time = get_utc_secs();
+        curr_user->max_score = user_score;
+      }
+    }
+    schedule_game_status = true;
+  }
+}
+void enable_reverse_effect() {
+  if (reverse_effect) {
+    return;
+  }
+  reverse_effect = true;
+  pause_effect = false;
+  slowdown_effect = false;
+  music_player->play_sound("rewind.wav");
+  Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
+    (void)_;
+    reverse_effect = false;
+  });
+}
+
+void enable_pause_effect() {
+  if (reverse_effect || pause_effect) {
+    return;
+  }
+  pause_effect = true;
+  slowdown_effect = false;
+  music_player->play_sound("pause.wav");
+  Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
+    (void)_;
+    pause_effect = false;
+  });
+}
+
+void enable_slowdown_effect() {
+  if (slowdown_effect || pause_effect || reverse_effect) {
+    return;
+  }
+  slowdown_effect = true;
+  music_player->play_sound("freeze.wav");
+  Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
+    (void)_;
+    slowdown_effect = false;
+  });
+}
+
+void remake_user_power_ups() {
+  user_power_ups = "";
+  int curr_size = 0;
+  user_power_ups += "None\0";
+  for (const auto &[name, cnt] : curr_user->power_ups) {
+    if (cnt <= 0) {
+      continue;
+    }
+    curr_size = name.size();
+    user_power_ups += name;
+    assert(curr_size < 32);
+    while (curr_size < 32) {
+      user_power_ups.push_back(' ');
+    }
+    user_power_ups += to_string(cnt);
+    user_power_ups += '\0';
+  }
+  user_power_ups += '\0';
+}
+
+void remake_center_ball() {
+  if (center_ball == nullptr) {
+    UID(cball_color, 0, ball_textures.size() - 1);
+    int col = cball_color(rng);
+    while (in_game_ball_colors.size() &&
+           in_game_ball_colors.find(col) == in_game_ball_colors.end()) {
+      col = cball_color(rng);
+    }
+    center_ball = new ShootingBall(col, ball_textures[col], renderer, NULL);
+  }
+};
+
 void generate_game_balls(const int cnt_balls) {
   UID(color_gen, 0, ball_textures.size() - 1);
   for (int i = 0; i < cnt_balls; i++) {
@@ -34,6 +136,7 @@ void show_login_screen() {
 void show_main_menu() {
   ImGui::Begin("Settings", NULL, 0);
   ImGui::Text("Logged in as:");
+  ImGui::SameLine();
   ImGui::TextColored(ImVec4(0.96, 0.76, 0.07, 1.0), "%s",
                      curr_user->name.c_str());
   if (ImGui::Combo("Select Map", &selected_map, maps_combo_choices.c_str())) {
@@ -77,9 +180,9 @@ void show_main_menu() {
     } else if (game_mode == GameMode::Timed) {
       generate_game_balls(200);
     }
-    map_location = 0;
     game_start_time = curr_time;
     curr_game_status = GameStatus::PLAYING;
+    prev_ball_dist = curr_map->prev_ball_dist;
   }
   ImGui::SameLine();
   if (ImGui::Button("Logout", ImVec2(100, 30))) {
@@ -106,6 +209,10 @@ void setup_textures() {
   reverse_txt = IMG_LoadTexture(renderer, "../art/images/reverse.png");
   colordots_txt = IMG_LoadTexture(renderer, "../art/images/color-dots.png");
   greyball_txt = IMG_LoadTexture(renderer, "../art/images/ball06.png");
+  uncolored_txt = IMG_LoadTexture(renderer, "../art/images/color-circle.png");
+  frozenball_txt = IMG_LoadTexture(renderer, "../art/images/snowflake.png");
+  bomb_txt = IMG_LoadTexture(renderer, "../art/images/bomb.png");
+  fire_txt = IMG_LoadTexture(renderer, "../art/images/fire.png");
 }
 
 void destroy_textures() {
@@ -118,6 +225,8 @@ void destroy_textures() {
   SDL_DestroyTexture(bomb_txt);
   SDL_DestroyTexture(fire_txt);
   SDL_DestroyTexture(motivational_txt);
+  SDL_DestroyTexture(frozenball_txt);
+  SDL_DestroyTexture(uncolored_txt);
 
   for (auto &txt : ball_textures) {
     SDL_DestroyTexture(txt);
@@ -132,7 +241,7 @@ bool clear_balls(list<Ball *> &balls, list<Ball *>::iterator &it) {
   while (mn_ptr != balls.begin()) {
     pptr = mn_ptr;
     mn_ptr--;
-    if (!(*mn_ptr)->same_color(*(*pptr))) {
+    if (!(*mn_ptr)->same_color(**pptr)) {
       mn_ptr++;
       break;
     }
@@ -142,7 +251,7 @@ bool clear_balls(list<Ball *> &balls, list<Ball *>::iterator &it) {
   while (mx_ptr != balls.end()) {
     pptr = mx_ptr;
     mx_ptr++;
-    if (mx_ptr == balls.end() || !(*mx_ptr)->same_color(*(*pptr))) {
+    if (mx_ptr == balls.end() || !(*mx_ptr)->same_color(**pptr)) {
       mx_ptr--;
       break;
     }
@@ -151,6 +260,7 @@ bool clear_balls(list<Ball *> &balls, list<Ball *>::iterator &it) {
   if (cnt >= 3) {
     assert((*mn_ptr)->same_color(**mx_ptr));
     assert(it != mx_ptr || it != mn_ptr);
+    assert(mn_ptr != mx_ptr);
     mx_ptr++;
     it = mx_ptr;
     for (auto pt = mn_ptr; pt != mx_ptr;) {
@@ -161,6 +271,7 @@ bool clear_balls(list<Ball *> &balls, list<Ball *>::iterator &it) {
       } else if ((*pt)->reverse) {
         enable_reverse_effect();
       }
+      delete *pt;
       pt = balls.erase(pt);
     }
     assert(it == mx_ptr);
@@ -171,7 +282,7 @@ bool clear_balls(list<Ball *> &balls, list<Ball *>::iterator &it) {
 }
 
 int render_balls(list<Ball *> &balls, list<ShootingBall *> &shot_balls, int gs,
-                 const double dt, double &step, double &map_location) {
+                 const double dt, double &step) {
   if (balls.empty()) {
     if (game_mode == GameMode::Timed) {
       double time_sc = (FINISHUP_MAXTIME / GLOBAL_SPEED_FACTOR) -
@@ -191,7 +302,6 @@ int render_balls(list<Ball *> &balls, list<ShootingBall *> &shot_balls, int gs,
   if (gs == GameStatus::PLAYING && !pause_effect) {
     step = GLOBAL_SPEED_FACTOR * dt * 100 * (slowdown_effect ? 0.5 : 1.0);
     step = reverse_effect ? -step : step;
-    map_location += step;
   } else {
     step = 0;
   }
@@ -212,7 +322,7 @@ int render_balls(list<Ball *> &balls, list<ShootingBall *> &shot_balls, int gs,
       }
     }
   }
-  balls.front()->move_to_location(map_location);
+  balls.front()->move_to_location(balls.front()->loc_index + step);
   auto ptr = balls.begin();
   for (int i = 1; i < int(balls.size()); i++) {
     ptr++;
@@ -235,12 +345,44 @@ int render_balls(list<Ball *> &balls, list<ShootingBall *> &shot_balls, int gs,
     sptr = shot_balls.begin();
     while (sptr != shot_balls.end()) {
       if ((*ptr)->collides(**sptr)) {
+        if((*sptr)->is_fire) {
+          music_player->play_sound("fire.wav");
+          (*sptr)->is_fire = false;
+          (*sptr)->create_texture();
+          auto tmp = balls.begin();
+          while(tmp != balls.end()) {
+            if((*tmp)->should_render == false && (*tmp)->loc_index < 10) {
+              break;
+            }
+            (*tmp)->unfreeze();
+            tmp++;
+          }
+        } else if((*sptr)->is_bomb) {
+          music_player->play_sound("bomb.wav");
+          auto fptr = ptr;
+          for(int i = 0; i < 3 && fptr != balls.begin(); i++) {
+            fptr--;
+            (*fptr)->ball_color = 0;
+            (*fptr)->frozen = false;
+            (*fptr)->uncolored = false;
+          }
+          fptr = ptr;
+          for(int i = 0; i < 3 && fptr != balls.end(); i++, fptr++) {
+            (*fptr)->ball_color = 0;
+            (*fptr)->frozen = false;
+            (*fptr)->uncolored = false;
+          }
+          (*sptr)->ball_color = 0;
+          (*sptr)->is_bomb = false;
+        }
         recalculate = true;
         if ((*ptr)->same_color(**sptr) && clear_balls(balls, ptr)) {
+          delete *sptr;
           sptr = shot_balls.erase(sptr);
           ptr--;
         } else if (++ptr != balls.end() && (*ptr)->same_color(**sptr) &&
                    clear_balls(balls, ptr)) {
+          delete *sptr;
           sptr = shot_balls.erase(sptr);
           ptr--;
           ptr--;
@@ -254,6 +396,7 @@ int render_balls(list<Ball *> &balls, list<ShootingBall *> &shot_balls, int gs,
           } else {
             balls.insert(++ptr, &(*sptr)->to_normal_ball((*bptr)->locations));
           }
+          // Do not delete sptr!
           sptr = shot_balls.erase(sptr);
           ptr--;
         }
@@ -268,20 +411,29 @@ int render_balls(list<Ball *> &balls, list<ShootingBall *> &shot_balls, int gs,
   if (recalculate) {
     music_player->play_sound("collision.wav");
     ptr = balls.begin();
-    map_location = (*ptr)->loc_index;
     for (int i = 1; i < int(balls.size()); i++) {
       const double pos = (*ptr)->get_previous_ball_pos();
       (*(++ptr))->move_to_location(pos);
+      if((*ptr)->should_render == false && (*ptr)->loc_index < 10) {
+        break;
+      }
     }
   }
   in_game_ball_colors.clear();
-  for (auto b : balls) {
+  ptr = balls.begin();
+  while(ptr != balls.end()){
+    auto b = *ptr;
     if (b->loc_index > 100 && b->should_render == false &&
         game_mode == GameMode::FinishUp) {
       return GameStatus::LOST;
+    } else if(b->loc_index > 100 && b->should_render == false) {
+      delete b;
+      ptr = balls.erase(ptr);
+      continue;
     }
     in_game_ball_colors.insert(b->ball_color & COLOR_MSK);
     b->draw_ball();
+    ptr++;
   }
   return GameStatus::PLAYING;
 }

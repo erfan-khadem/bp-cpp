@@ -36,6 +36,7 @@ using std::regex;
 class Map {
 public:
   int num_points;
+  double prev_ball_dist;
 
   SDL_Renderer *rend;
 
@@ -84,16 +85,13 @@ public:
     assert(map_file.is_open());
     {
       int number_of_coordinates = 0;
-      int is_map_available;
 
-      map_file >> is_map_available;
-      if (is_map_available == 1) {
-        map_file >> number_of_coordinates;
-        for (int i = 0; i < number_of_coordinates; i++) {
-          int x, y;
-          map_file >> x >> y;
-          locations.emplace_back(x, y);
-        }
+      map_file >> prev_ball_dist;
+      map_file >> number_of_coordinates;
+      for (int i = 0; i < number_of_coordinates; i++) {
+        int x, y;
+        map_file >> x >> y;
+        locations.emplace_back(x, y);
       }
       map_file.close();
     }

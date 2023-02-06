@@ -18,8 +18,6 @@ void AlignForWidth(float width, float alignment = 0.5f) {
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
 }
 
-void destroy_gui_textures() { SDL_DestroyTexture(motivational_txt); }
-
 User *login_or_register(UserMap &umap) {
   static bool should_register = false;
   static bool should_show_password = false;
@@ -108,11 +106,35 @@ void user_lost() {
   ImGui::End();
 }
 
-void user_won() {
+void user_won(u64 user_score, vector<Map *> &maps, Map *curr_map) {
+  static char buf[100];
+  static u64 prev_score = UINT64_MAX;
   ImGui::Begin("You Won!", NULL, ImGuiWindowFlags_NoTitleBar);
   float width = ImGui::CalcTextSize("You Won!").x;
   AlignForWidth(width);
   ImGui::TextColored(ImVec4(0.18, 0.76, 0.49, 1.0), "You Won!");
+  if(user_score != prev_score){
+    snprintf(buf, 90, "Score: %lu", user_score);
+    prev_score = user_score;
+  }
+  width = ImGui::CalcTextSize(buf).x;
+  AlignForWidth(width);
+  ImGui::TextColored(ImVec4(0.96, 0.76, 0.07, 1.0), buf);
+  width = ImGui::CalcTextSize("Try Other maps:").x;
+  AlignForWidth(width);
+  ImGui::Text("Try Other maps:");
+  AlignForWidth((2 * SCREEN_W) / 3);
+  int cnt = 0;
+  for(int i = 0; i < (int)maps.size() && cnt != 2; i++) {
+    if(maps.at(i) == curr_map) {
+      continue;
+    }
+    if(cnt >= 1) {
+      ImGui::SameLine();
+    }
+    cnt++;
+    ImGui::Image((void*)maps.at(i)->blended_txt, ImVec2(SCREEN_W / 3, SCREEN_H / 3));
+  }
   ImGui::End();
 }
 
