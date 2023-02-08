@@ -2,16 +2,29 @@
     {
         "game_mode": 0,
         "idx_pup": 0,
-        "max_score": 1620,
-        "max_score_time": 1675202033,
+        "max_score": 380,
+        "max_score_time": 1675881146,
+        "name": "abbas\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
+        "play_music": true,
+        "play_sfx": true,
+        "power_ups": {},
+        "pw_hash": "$argon2id$v=19$m=1048576,t=4,p=1$732eU3T5ggFyXfcDOl3gsA$upqwXJq/7Qwue100Rza0pcJ7SR5t0ff4jj9/Ds5y4Tc\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
+        "register_time": 1675880396,
+        "selected_map": 0
+    },
+    {
+        "game_mode": 0,
+        "idx_pup": 0,
+        "max_score": 1760,
+        "max_score_time": 1675766277,
         "name": "erfan\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
-        "play_music": false,
+        "play_music": true,
         "play_sfx": true,
         "power_ups": {
-            "Good Luck": 0
+            "Good Luck": 5
         },
         "pw_hash": "$argon2id$v=19$m=1048576,t=4,p=1$CTfbtEMPAasc03ePIPfgPA$nvmXovajYTpxqHOiaTAFfb5mxaEFvjh0wpBdXz0M72M\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
         "register_time": 1675202033,
-        "selected_map": 4
+        "selected_map": 2
     }
 ]

@@ -12,9 +12,9 @@
 #define SCREEN_W 1280
 #define SCREEN_H 800
 #define HOLDER_DIM 112
-#define DEBUG true
+//#define DEBUG true
 #define NUM_BALLS 40
-// #define DEBUG false
+#define DEBUG false
 
 #define PI ((double)3.141592653589793)
 #define RAD_TO_DEG ((double)180.0 / PI)

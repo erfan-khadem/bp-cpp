@@ -61,6 +61,7 @@ void remake_user_power_ups() {
     user_power_ups += to_string(cnt);
     user_power_ups += "\0";
   }
+  user_power_ups += "\0";
 }
 
 void remake_center_ball() {
@@ -77,11 +78,12 @@ void remake_center_ball() {
 
 void reset_game_status() {
   if (schedule_game_status == false) {
+    schedule_game_status = true;
+    Scheduler::schedule.clear();
     Scheduler::schedule.emplace(curr_time + 5'000, [&](const s64 _) {
       (void)_;
       schedule_game_status = false;
       curr_game_status = GameStatus::NOT_STARTED;
-      game_speed_factor = 1.0;
       user_score = 0;
       good_luck = false;
     });
@@ -108,7 +110,6 @@ void reset_game_status() {
       remake_user_power_ups();
     }
   }
-  schedule_game_status = true;
 }
 
 void generate_game_balls(const int cnt_balls) {
@@ -130,6 +131,20 @@ void show_login_screen() {
     curr_user = login_or_register(users);
   }
   if (curr_user != nullptr) {
+    if(curr_user->play_music != play_music){
+      if(curr_user->play_music) {
+        music_player->unpause_music();
+      } else {
+        music_player->pause_music();
+      }
+    }
+    if(curr_user->play_sfx != play_sfx) {
+      if(curr_user->play_sfx) {
+        music_player->unpause_sound();
+      } else {
+        music_player->pause_sound();
+      }
+    }
     curr_user->load_settings();
     remake_user_power_ups();
   }
@@ -177,7 +192,7 @@ void show_main_menu() {
       selected_power_up = "None";
     }
     assert(curr_map != nullptr);
-    target_num_balls = curr_map->locations.size() / 125;
+    target_num_balls = curr_map->locations.size() / 40;
     if (game_mode == GameMode::FinishUp) {
       generate_game_balls(target_num_balls);
     } else if (game_mode == GameMode::Timed) {
@@ -186,6 +201,7 @@ void show_main_menu() {
     game_start_time = curr_time;
     curr_game_status = GameStatus::PLAYING;
     prev_ball_dist = curr_map->prev_ball_dist;
+    game_speed_factor = curr_map->prev_ball_dist / 30;
   }
   if (selected_power_up == PUP_LUCK) {
     good_luck = true;
@@ -306,7 +322,7 @@ int render_balls(list<Ball *> &balls, list<ShootingBall *> &shot_balls, int gs,
     return GameStatus::WON;
   }
   if (gs == GameStatus::PLAYING && !pause_effect) {
-    step = GLOBAL_SPEED_FACTOR * dt * 100 * (slowdown_effect ? 0.5 : 1.0);
+    step = GLOBAL_SPEED_FACTOR * dt * game_speed_factor * 100 * (slowdown_effect ? 0.5 : 1.0);
     step = reverse_effect ? -step : step;
   } else {
     step = 0;

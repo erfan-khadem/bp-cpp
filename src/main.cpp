@@ -20,7 +20,6 @@
 #include "music-player.h"
 #include "utils/common.h"
 #include "utils/error_handling.h"
-// #include "user.h"
 #include "gui.hpp"
 #include "scheduler.hpp"
 #include "slideshow.hpp"
@@ -43,7 +42,7 @@ double map_location_step = 0;
 double game_speed_factor = 1.0;
 
 bool pause_cooldown = false;
-bool play_music = false;
+bool play_music = true;
 bool play_sfx = true;
 bool schedule_game_status = false;
 bool reverse_effect = false;
@@ -358,6 +357,10 @@ int main(int argc, char **argv) {
 
   for (auto &x : maps) {
     delete x;
+  }
+
+  if (curr_user != nullptr) {
+    curr_user->save_settings();
   }
 
   destroy_textures();

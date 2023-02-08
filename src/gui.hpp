@@ -57,6 +57,9 @@ User *login_or_register(UserMap &umap) {
   if (ImGui::Button("Login", ImVec2(100, 30))) {
     auto usr = umap.find(username);
     if (usr == umap.end()) {
+      float width = ImGui::CalcTextSize("User Not Found!").x;
+      AlignForWidth(width);
+      ImGui::TextColored({1.0, 0.2, 0.2, 1.0}, "User Not Found");
       goto show_registration;
     }
     auto &user = usr->second;
@@ -76,6 +79,9 @@ show_registration:
     if (ImGui::Button("Register User", ImVec2(200, 30))) {
       User *user = nullptr;
       if (umap.find(username) != umap.end()) {
+        float width = ImGui::CalcTextSize("User Already Exists!").x;
+        AlignForWidth(width);
+        ImGui::TextColored({1.0, 0.2, 0.2, 1.0}, "User Already Exists!");
         goto end_draw;
       }
       user = new User(username, password);
