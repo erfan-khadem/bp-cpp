@@ -307,13 +307,13 @@ int render_balls(list<Ball *> &balls, list<ShootingBall *> &shot_balls, int gs,
                  const double dt, double &step) {
   if (balls.empty()) {
     if (game_mode == GameMode::Timed) {
-      double time_sc = (FINISHUP_MAXTIME / GLOBAL_SPEED_FACTOR) -
+      double time_sc = (TIMED_MODE_MAXTIME / GLOBAL_SPEED_FACTOR) -
                        (curr_time - game_start_time);
       time_sc = max(0.0, time_sc);
       user_score += time_sc / 10;
     }
     return GameStatus::WON;
-  } else if (game_mode == GameMode::Timed &&
+  } else if (game_mode == GameMode::FinishUp &&
              (curr_time - game_start_time) > TIMED_MODE_MAXTIME) {
     double time_sc = (FINISHUP_MAXTIME / GLOBAL_SPEED_FACTOR) -
                      (curr_time - game_start_time);
