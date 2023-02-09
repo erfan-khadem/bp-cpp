@@ -60,7 +60,7 @@ User *login_or_register(UserMap &umap) {
       float width = ImGui::CalcTextSize("User Not Found!").x;
       AlignForWidth(width);
       ImGui::TextColored({1.0, 0.2, 0.2, 1.0}, "User Not Found");
-      goto show_registration;
+      goto end_draw;
     }
     auto &user = usr->second;
     if (verify_user(user, password)) {
