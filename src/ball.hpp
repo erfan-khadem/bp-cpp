@@ -103,8 +103,7 @@ public:
         } else {
           freeze = true;
         }
-      }
-      if(special_power(rng) < 0.1) {
+      } else if(special_power(rng) < 0.1) {
         if(special_power(rng) < 0.5) {
           uncolored = true;
           ball_color = UNCOLORED;
