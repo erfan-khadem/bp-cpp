@@ -9,7 +9,8 @@ FILLS = [
     ("#e66100", "#ffa348"),
     ("#f5c211", "#f8e45c"),
     ("#c01c28", "#ed333b"),
-    ("#813d9c", "#c061cb")
+    ("#813d9c", "#c061cb"),
+    ("#5e5c64", "#77767b"),
 ]
 
 def draw_circle(draw: ImageDraw, radius: int, fill: str | tuple) -> None:
