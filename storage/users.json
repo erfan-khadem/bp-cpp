@@ -25,6 +25,6 @@
         },
         "pw_hash": "$argon2id$v=19$m=1048576,t=4,p=1$CTfbtEMPAasc03ePIPfgPA$nvmXovajYTpxqHOiaTAFfb5mxaEFvjh0wpBdXz0M72M\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
         "register_time": 1675202033,
-        "selected_map": 1
+        "selected_map": 0
     }
 ]
